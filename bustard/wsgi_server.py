@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
+import datetime
 import socket
 import StringIO
 import sys
@@ -76,6 +77,11 @@ class WSGIServer(object):
         self.parse_request(raw_request)
         self.parse_headers(raw_request)
         env = self.get_environ()
+
+        print('[%s] "%s %s %s"' % (
+            datetime.datetime.now(), env['REQUEST_METHOD'],
+            env['PATH_INFO'], env['SERVER_PROTOCOL'],
+        ))
 
         result = self.application(env, self.start_response)
         self.finish_response(result)
