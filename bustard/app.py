@@ -21,6 +21,7 @@ class Bustard(object):
         print(path, method)
         print(self._route.methods)
         func = self._route.get_func(path, method)
+        import pdb; pdb.set_trace()
         result = func()
         if isinstance(result, (list, tuple)):
             status, data, headers = result
