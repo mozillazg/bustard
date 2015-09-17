@@ -39,9 +39,11 @@ class Bustard(object):
 
         return self.make_response(data, status, headers)
 
-    def make_response(self, body, code=200, headers=None):
+    def make_response(self, body, code=200, headers=None,
+                      content_type='text/html'):
         status_code = str(code) + ' ' + httplib.responses.get(code)
         headers = {} if headers is None else headers
+        headers.setdefault('Content-Type', content_type)
         header_list = headers.items()
         self.start_response(status_code, header_list)
         return [body]
