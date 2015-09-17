@@ -7,6 +7,12 @@ import httplib
 from .router import Router
 from .wsgi_server import make_server
 
+NOTFOUND_HTML = """
+<html>
+    <h1>404 Not Found</h1>
+</html>
+"""
+
 
 class Bustard(object):
     def __init__(self):
@@ -21,7 +27,10 @@ class Bustard(object):
         print(path, method)
         print(self._route.methods)
         func = self._route.get_func(path, method)
-        import pdb; pdb.set_trace()
+
+        if func is None:
+            return self.notfound()
+
         result = func()
         if isinstance(result, (list, tuple)):
             status, data, headers = result
@@ -44,6 +53,9 @@ class Bustard(object):
             return func
 
         return wrapper
+
+    def notfound(self):
+        return self.make_response(NOTFOUND_HTML, code=404)
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
