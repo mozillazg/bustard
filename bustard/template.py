@@ -8,7 +8,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 支持
 
 * 直接输出变量：{{ foobar }}
-* if 语句：{% if True %} {% endif %}
+* if 语句：{% if xx %} {% elif yy %} {% else %} {% endif %}
 * for 循环：{% for x in lst %} {% endfor %}
 * 内置函数: {{ '  foobar  '.strip() }}
 * 访问对象的属性和方法: {{ foo.bar }} {{ foo.hello() }}
@@ -136,14 +136,24 @@ class Template(object):
                                            self.TOKEN_TAG_END)
                 words = express.split()
                 if words[0] == 'if':
-                    global_var = self.collect_var(words[1])
+                    global_var = self.collect_var(' '.join(words[1:]))
 
                     self.code.add_line('if %s:' % self.wrap_var(global_var))
+                    self.code.forward_indent()
+                if words[0] == 'elif':
+                    self.code.back_indent()
+                    global_var = self.collect_var(' '.join(words[1:]))
+
+                    self.code.add_line('elif %s:' % self.wrap_var(global_var))
+                    self.code.forward_indent()
+                if words[0] == 'else':
+                    self.code.back_indent()
+                    self.code.add_line('else:')
                     self.code.forward_indent()
 
                 elif words[0] == 'for':
                     tmp_var = self.collect_tmp_var(words[1])
-                    global_var = self.collect_var(words[3])
+                    global_var = self.collect_var(''.join(words[3:]))
 
                     self.code.add_line('for _%s in %s:'
                                        % (tmp_var, global_var))
@@ -175,8 +185,8 @@ class Template(object):
         """将模板中出现的变量加入到 global_vars 中"""
         var = var.strip()
         # 不处理 {{ "abc" }}
-        if not (var.startswith('"') or var.startswith('\'')):
-            _var = re.split(r'[\[\.\(]', var, 1)[0]
+        if var and not (var.startswith('"') or var.startswith('\'')):
+            _var = re.split(r'[^\w]', var, 1)[0]
             self.global_vars.add(_var)
         return var
 
@@ -189,7 +199,10 @@ class Template(object):
     def wrap_var(self, var):
         """处理变量, 将临时变量的名称增加 _ 前缀"""
         var = var.strip()
-        if var in self.tmp_vars:
+        if len(re.split(r'[^\w]', var)) > 1:
+            for name in self.tmp_vars:
+                return var.replace(name, '_%s' % name)
+        elif var in self.tmp_vars:
             return '_%s' % var
         else:
             self.collect_var(var)
