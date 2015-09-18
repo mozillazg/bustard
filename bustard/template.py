@@ -18,7 +18,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import __builtin__
 from copy import deepcopy
 import re
-from types import TypeType, FunctionType
+from types import TypeType, BuiltinFunctionType
 
 
 class CodeBuilder(object):
@@ -77,7 +77,7 @@ class Template(object):
     def __init__(self, text, context=None):
         self.context = {k: v
                         for k, v in __builtin__.__dict__.iteritems()
-                        if (isinstance(v, (TypeType, FunctionType))
+                        if (isinstance(v, (TypeType, BuiltinFunctionType))
                             and not k.startswith('__'))
                         }
         if context is not None:
@@ -184,24 +184,35 @@ class Template(object):
     def collect_var(self, var):
         """将模板中出现的变量加入到 global_vars 中"""
         var = var.strip()
-        # 不处理 {{ "abc" }}
-        if var and not (var.startswith('"') or var.startswith('\'')):
-            _var = re.split(r'[^\w]', var, 1)[0]
-            self.global_vars.add(_var)
+        self._collect_var(var, self.global_vars)
         return var
 
     def collect_tmp_var(self, var):
         """收集循环中定义的临时变量"""
         var = var.strip()
-        self.tmp_vars.add(var)
+        self._collect_var(var, self.tmp_vars)
         return var
+
+    def _collect_var(self, var, collect):
+        # 不处理 {{ "abc" }}
+        if (not var) or var.startswith('"') or var.startswith('\''):
+            return
+
+        _vars = re.split(r'[^\w"\']+', var)
+        if len(_vars) > 1:   # {% if len(foobar) %}
+            for _var in _vars:
+                self._collect_var(_var, collect)
+        elif re.match(r'^[a-zA-Z_](\w+)?', _vars[0]):
+            collect.add(_vars[0])
 
     def wrap_var(self, var):
         """处理变量, 将临时变量的名称增加 _ 前缀"""
         var = var.strip()
-        if len(re.split(r'[^\w]', var)) > 1:
+        if len(re.split(r'[^\w]', var)) > 1:  # {% for tp in enumerate(foo) %}
             for name in self.tmp_vars:
                 return var.replace(name, '_%s' % name)
+            return var
+
         elif var in self.tmp_vars:
             return '_%s' % var
         else:
