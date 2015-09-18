@@ -152,11 +152,14 @@ class Template(object):
                     self.code.forward_indent()
 
                 elif words[0] == 'for':
-                    tmp_var = self.collect_tmp_var(words[1])
-                    global_var = self.collect_var(''.join(words[3:]))
+                    in_index = words.index('in')
+                    tmp_var = self.collect_tmp_var(' '.join(words[1:in_index]))
+                    global_var = self.collect_var(
+                        ' '.join(words[in_index + 1:])
+                    )
 
-                    self.code.add_line('for _%s in %s:'
-                                       % (tmp_var, global_var))
+                    self.code.add_line('for %s in %s:'
+                                       % (self.wrap_var(tmp_var), global_var))
                     self.code.forward_indent()
 
                 elif words[0].startswith('end'):
@@ -209,9 +212,10 @@ class Template(object):
         """处理变量, 将临时变量的名称增加 _ 前缀"""
         var = var.strip()
         if len(re.split(r'[^\w]', var)) > 1:  # {% for tp in enumerate(foo) %}
+            _var = var
             for name in self.tmp_vars:
-                return var.replace(name, '_%s' % name)
-            return var
+                _var = _var.replace(name, '_%s' % name)
+            return _var
 
         elif var in self.tmp_vars:
             return '_%s' % var
