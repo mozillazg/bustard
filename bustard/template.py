@@ -10,10 +10,15 @@ from __future__ import absolute_import, print_function, unicode_literals
 * 直接输出变量：{{ foobar }}
 * if 语句：{% if True %} {% endif %}
 * for 循环：{% for x in lst %} {% endfor %}
+* 内置函数: {{ '  foobar  '.strip() }}
+* 访问对象的属性和方法: {{ foo.bar }} {{ foo.hello() }}
+* 字典或列表索引: {{ foo['bar'] }}
 
 """
+import __builtin__
 from copy import deepcopy
 import re
+from types import TypeType, FunctionType
 
 
 class CodeBuilder(object):
@@ -70,7 +75,11 @@ class Template(object):
     TOKEN_TAG_END = '%}'
 
     def __init__(self, text, context=None):
-        self.context = {}
+        self.context = {k: v
+                        for k, v in __builtin__.__dict__.iteritems()
+                        if (isinstance(v, (TypeType, FunctionType))
+                            and not k.startswith('__'))
+                        }
         if context is not None:
             self.context.update(context)
 
@@ -164,10 +173,11 @@ class Template(object):
 
     def collect_var(self, var):
         """将模板中出现的变量加入到 global_vars 中"""
-        # 不处理 {{ "abc" }}
         var = var.strip()
-        if not ((var.startswith('"') or var.startswith('\''))):
-            self.global_vars.add(var)
+        # 不处理 {{ "abc" }}
+        if not (var.startswith('"') or var.startswith('\'')):
+            _var = re.split(r'[\[\.\(]', var, 1)[0]
+            self.global_vars.add(_var)
         return var
 
     def collect_tmp_var(self, var):
