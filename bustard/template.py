@@ -135,23 +135,23 @@ class Template(object):
                 express = self.strip_token(token, self.TOKEN_TAG_START,
                                            self.TOKEN_TAG_END)
                 words = express.split()
-                if words[0] == 'if':
+                if words[0] == 'if':   # {% if xx %}
                     global_var = self.collect_var(' '.join(words[1:]))
 
                     self.code.add_line('if %s:' % self.wrap_var(global_var))
                     self.code.forward_indent()
-                if words[0] == 'elif':
+                elif words[0] == 'elif':  # {% elif xx %}
                     self.code.back_indent()
                     global_var = self.collect_var(' '.join(words[1:]))
 
                     self.code.add_line('elif %s:' % self.wrap_var(global_var))
                     self.code.forward_indent()
-                if words[0] == 'else':
+                elif words[0] == 'else':  # {% else %}
                     self.code.back_indent()
                     self.code.add_line('else:')
                     self.code.forward_indent()
 
-                elif words[0] == 'for':
+                elif words[0] == 'for':  # {% for x in y %}
                     in_index = words.index('in')
                     tmp_var = self.collect_tmp_var(' '.join(words[1:in_index]))
                     global_var = self.collect_var(
@@ -162,10 +162,10 @@ class Template(object):
                                        % (self.wrap_var(tmp_var), global_var))
                     self.code.forward_indent()
 
-                elif words[0].startswith('end'):
+                elif words[0].startswith('end'):  # {% endif %}, {% endfor %}
                     self.code.back_indent()
 
-            else:
+            else:   # 普通字符串
                 self.buffered.append('%s' % repr(token))
 
         # 定义模板中用到的全局变量
