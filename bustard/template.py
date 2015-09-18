@@ -2,43 +2,64 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
-"""简单的模板引擎"""
+"""
+简单的模板引擎
+
+支持
+
+* 直接输出变量：{{ foobar }}
+* if 语句：{% if True %} {% endif %}
+* for 循环：{% for x in lst %} {% endfor %}
+
+"""
+from copy import deepcopy
 import re
 
 
 class CodeBuilder(object):
+    # 缩进步长
     INDENT_STEP = 4
 
     def __init__(self, indent=0):
         self.code = []
+        # 当前缩进
         self.indent_level = indent
 
     def add_line(self, line):
+        """增加一行代码"""
         line = ' ' * self.indent_level + line + '\n'
         self.code.extend([line])
 
     def forward_indent(self):
+        """缩进前进一步"""
         self.indent_level += self.INDENT_STEP
 
     def back_indent(self):
+        """缩进后退一步"""
         self.indent_level -= self.INDENT_STEP
 
     def add_section(self):
+        """申请一个基于当前缩进的代码块"""
         section = CodeBuilder(self.indent_level)
         self.code.append(section)
         return section
 
-    def get_namespace(self):
+    def _compile(self):
+        """编译生成的代码"""
         assert self.indent_level == 0
-        python_code = unicode(self)
+        self._code = compile(unicode(self), '<source>', 'exec')
+        return self._code
+
+    def get_namespace(self):
+        """执行生成的代码"""
         namespace = {}
-        exec(python_code, namespace)
+        exec(self._code, namespace)
         return namespace
 
     def __unicode__(self):
         return "".join(unicode(s) for s in self.code)
 
-    def __start__(self):
+    def __str__(self):
         return str(self.__unicode__())
 
 
@@ -52,17 +73,30 @@ class Template(object):
         self.context = {}
         if context is not None:
             self.context.update(context)
+
         self.buffered = []
         self.code = code = CodeBuilder()
         code.add_line('def render_function(context):')
         code.forward_indent()
-        self.section_vars = code.add_section()  # 定义 context 内的变量
+
+        # 定义 context 内的变量
+        self.section_vars = code.add_section()
+        # 将函数内的执行结果保存在 result 中
         code.add_line('result = []')
 
         self.tpl_text = text
-        self.all_vars = set()  # 模板中出现过的变量
-        self.local_vars = set()  # 模板中定义的变量
+        # 模板中出现过的全局变量
+        self.global_vars = set()
+        # 模板中定义的变量
+        self.tmp_vars = set()
+
+        # 解析模板
         self.parse_text(text)
+
+        # 编译生成的代码
+        self.code._compile()
+        namespace = self.code.get_namespace()
+        self.render_function = namespace['render_function']
 
     def parse_text(self, text):
         tokens = re.split(r'''(?sx)
@@ -80,17 +114,11 @@ class Template(object):
         for token in tokens:
             # {{ abc }}
             if token.startswith(self.TOKEN_EXPR_START):
-                expr = self.strip_token(token, self.TOKEN_EXPR_START,
-                                        self.TOKEN_EXPR_END).strip()
+                global_var = self.strip_token(token, self.TOKEN_EXPR_START,
+                                              self.TOKEN_EXPR_END).strip()
+                global_var = self.collect_var(global_var)
 
-                if not ((expr.startswith('"') or expr.startswith('\''))):
-                    self.all_vars.add(expr)
-                if expr in self.local_vars:
-                    expr = 'unicode(_%s)' % expr
-                else:
-                    expr = 'unicode(%s)' % expr
-
-                self.buffered.append(expr)
+                self.buffered.append('unicode(%s)' % self.wrap_var(global_var))
 
             # {% blala %}
             elif token.startswith(self.TOKEN_TAG_START):
@@ -99,27 +127,27 @@ class Template(object):
                                            self.TOKEN_TAG_END)
                 words = express.split()
                 if words[0] == 'if':
-                    expr = words[1].strip()
-                    self.all_vars.add(expr)
+                    global_var = self.collect_var(words[1])
 
-                    if expr in self.local_vars:
-                        self.code.add_line('if _%s:' % expr)
-                    else:
-                        self.code.add_line('if %s:' % expr)
+                    self.code.add_line('if %s:' % self.wrap_var(global_var))
                     self.code.forward_indent()
+
                 elif words[0] == 'for':
-                    expr = words[3].strip()
-                    self.all_vars.add(expr)
+                    tmp_var = self.collect_tmp_var(words[1])
+                    global_var = self.collect_var(words[3])
 
-                    self.code.add_line('for _%s in %s:' % (words[1], expr))
-                    self.local_vars.add(words[1])
+                    self.code.add_line('for _%s in %s:'
+                                       % (tmp_var, global_var))
                     self.code.forward_indent()
+
                 elif words[0].startswith('end'):
                     self.code.back_indent()
+
             else:
                 self.buffered.append('%s' % repr(token))
 
-        for name in self.all_vars - self.local_vars:
+        # 定义模板中用到的全局变量
+        for name in (self.global_vars - self.tmp_vars):
             self.section_vars.add_line('%s = context["%s"]' % (name, name))
 
         self.flush_buffer()
@@ -127,12 +155,35 @@ class Template(object):
         self.code.back_indent()
 
     def render(self, context=None):
+        """使用 context 字典渲染模板"""
+        _context = deepcopy(self.context)
         if context is not None:
-            self.context.update(context)
+            _context.update(context)
 
-        namespace = self.code.get_namespace()
-        render_function = namespace['render_function']
-        return render_function(context)
+        return self.render_function(_context)
+
+    def collect_var(self, var):
+        """将模板中出现的变量加入到 global_vars 中"""
+        # 不处理 {{ "abc" }}
+        var = var.strip()
+        if not ((var.startswith('"') or var.startswith('\''))):
+            self.global_vars.add(var)
+        return var
+
+    def collect_tmp_var(self, var):
+        """收集循环中定义的临时变量"""
+        var = var.strip()
+        self.tmp_vars.add(var)
+        return var
+
+    def wrap_var(self, var):
+        """处理变量, 将临时变量的名称增加 _ 前缀"""
+        var = var.strip()
+        if var in self.tmp_vars:
+            return '_%s' % var
+        else:
+            self.collect_var(var)
+            return var
 
     def flush_buffer(self):
         self.code.add_line('result.extend([%s])' % ','.join(self.buffered))
