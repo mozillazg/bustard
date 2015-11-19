@@ -15,8 +15,8 @@ class WSGIServer(object):
     socket_type = socket.SOCK_STREAM
     request_queue_size = 5
     allow_reuse_address = True
-    default_request_version = "HTTP/1.1"
-    server_version = "WSGIServer/0.1"
+    default_request_version = 'HTTP/1.1'
+    server_version = 'WSGIServer/0.1'
     weekdayname = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     monthname = [None,
                  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -174,7 +174,7 @@ class WSGIServer(object):
         if timestamp is None:
             timestamp = time.time()
         year, month, day, hh, mm, ss, wd, y, z = time.gmtime(timestamp)
-        s = "%s, %02d %3s %4d %02d:%02d:%02d GMT" % (
+        s = '%s, %02d %3s %4d %02d:%02d:%02d GMT' % (
             self.weekdayname[wd],
             day, self.monthname[month], year,
             hh, mm, ss

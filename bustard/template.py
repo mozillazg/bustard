@@ -65,7 +65,7 @@ class CodeBuilder(object):
         return namespace
 
     def __unicode__(self):
-        return "".join(unicode(s) for s in self.source_code)
+        return ''.join(unicode(s) for s in self.source_code)
 
     def __str__(self):
         return str(self.__unicode__())
@@ -78,6 +78,12 @@ class Template(object):
     TOKEN_TAG_END = '%}'
     TOKEN_COMMENT_START = '{#'
     TOKEN_COMMENT_END = '#}'
+    FUNC_BLACK_LIST = (
+        'exec', 'eval'
+    )
+    FUNC_WHITE_LIST = (
+        'enumerate', 'abs', 'float',
+    )
 
     def __init__(self, text, context=None,
                  pre_compile=True,
@@ -89,7 +95,9 @@ class Template(object):
         self.context = {k: v
                         for k, v in __builtin__.__dict__.iteritems()
                         if (isinstance(v, (TypeType, BuiltinFunctionType))
-                            and not k.startswith('__'))
+                            and (not k.startswith('_'))
+                            and k not in self.FUNC_BLACK_LIST
+                            )
                         }
         self.base_dir = template_dir
         self.func_name = func_name

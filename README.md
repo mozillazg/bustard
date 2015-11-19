@@ -1,6 +1,6 @@
 # bustard
 
-a tiny web framework powered by python.
+A tiny web framework powered by Python.
 
 
 ## features
