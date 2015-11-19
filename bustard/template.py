@@ -21,7 +21,8 @@ import __builtin__
 from copy import deepcopy
 import os
 import re
-from types import TypeType, BuiltinFunctionType
+
+from bustard import const
 
 
 class CodeBuilder(object):
@@ -78,12 +79,7 @@ class Template(object):
     TOKEN_TAG_END = '%}'
     TOKEN_COMMENT_START = '{#'
     TOKEN_COMMENT_END = '#}'
-    FUNC_BLACK_LIST = (
-        'exec', 'eval'
-    )
-    FUNC_WHITE_LIST = (
-        'enumerate', 'abs', 'float',
-    )
+    FUNC_WHITELIST = const.TEMPLATE_BUILTIN_FUNC_WHITELIST
 
     def __init__(self, text, context=None,
                  pre_compile=True,
@@ -94,10 +90,7 @@ class Template(object):
                  ):
         self.context = {k: v
                         for k, v in __builtin__.__dict__.iteritems()
-                        if (isinstance(v, (TypeType, BuiltinFunctionType))
-                            and (not k.startswith('_'))
-                            and k not in self.FUNC_BLACK_LIST
-                            )
+                        if k in self.FUNC_WHITELIST
                         }
         self.base_dir = template_dir
         self.func_name = func_name
