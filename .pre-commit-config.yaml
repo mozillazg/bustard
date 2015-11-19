@@ -1,0 +1,11 @@
+- repo: git@github.com:pre-commit/pre-commit-hooks
+  sha: daa1e9a837eceab5c0869ea7fa22a016311391ef
+  hooks:
+    - id: check-merge-conflict
+    - id: debug-statements
+    - id: double-quote-string-fixer
+    - id: end-of-file-fixer
+    - id: requirements-txt-fixer
+    - id: trailing-whitespace
+    - id: flake8
+    - id: fix-encoding-pragma
