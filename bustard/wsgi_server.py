@@ -100,7 +100,7 @@ class WSGIServer(object):
         for header in header_string.splitlines()[1:-1]:
             k, v = header.split(':', 1)
             if headers.get(k):
-                headers[k] += ',' + v.strip()  # 多个相同的 header
+                headers[k] += ', ' + v.strip()  # 多个相同的 header
             else:
                 headers[k] = v.strip()
 
