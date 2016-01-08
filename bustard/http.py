@@ -7,7 +7,7 @@ from collections import defaultdict
 from Cookie import SimpleCookie
 import json
 
-from .const import HTTP_STATUS_CODES
+from .constants import HTTP_STATUS_CODES
 
 
 class Request(object):
@@ -132,7 +132,7 @@ class Response(object):
 
     def __init__(self, content='', status_code=200, content_type='text/html',
                  headers=None):
-        self.content = content
+        self._content = content
         self._status_code = status_code
         if headers is None:
             self._headers = {}
@@ -140,6 +140,14 @@ class Response(object):
             self._headers = headers
         self._headers['Content-Type'] = content_type
         self._cookies = {}
+
+    @property
+    def content(self):
+        return self._content
+
+    @content.setter
+    def content(self, value):
+        self._content = value.encode('utf-8')
 
     @property
     def status_code(self):
@@ -152,11 +160,7 @@ class Response(object):
     @property
     def status(self):
         code = self._status_code
-        try:
-            mean = HTTP_STATUS_CODES[code].upper()
-        except KeyError:
-            mean = 'UNKNOWN'
-        return '{code} {mean}'.format(code=code, mean=mean)
+        return response_status_string(code)
 
     @property
     def headers(self):
@@ -169,6 +173,10 @@ class Response(object):
     @content_type.setter
     def content_type(self, value):
         self._headers['Content-Type'] = value
+
+    @property
+    def cookies(self):
+        return self._cookies
 
     def set_cookie(self, key, value='', max_age=None, expires=None, path='/',
                    domain=None, secure=False, httponly=False):
@@ -198,7 +206,7 @@ def cookie_dump(key, value='', max_age=None, expires=None, path='/',
     :rtype: ``Cookie.SimpleCookie``
     """
     cookie = SimpleCookie()
-    cookie[key] = value
+    cookie[key.encode('utf-8')] = value.encode('utf-8')
     for attr in ('max_age', 'expires', 'path', 'domain',
                  'secure', 'httponly'):
         attr_key = attr.replace('_', '-')
@@ -206,3 +214,17 @@ def cookie_dump(key, value='', max_age=None, expires=None, path='/',
         if attr_value:
             cookie[key][attr_key] = attr_value
     return cookie
+
+
+def response_status_string(code):
+    """e.g. ``200 OK`` """
+    mean = HTTP_STATUS_CODES.get(code, 'unknown').upper()
+    return '{code} {mean}'.format(code=code, mean=mean)
+
+
+def jsonify():
+    raise NotImplementedError
+
+
+def redirect():
+    raise NotImplementedError

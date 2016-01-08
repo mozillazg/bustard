@@ -7,5 +7,5 @@ A tiny web framework powered by Python.
 
 * wsgi server
 * template
-* route
+* router
 * view
