@@ -22,7 +22,7 @@ from copy import deepcopy
 import os
 import re
 
-from bustard import const
+from .constants import TEMPLATE_BUILTIN_FUNC_WHITELIST
 
 
 class CodeBuilder(object):
@@ -79,7 +79,7 @@ class Template(object):
     TOKEN_TAG_END = '%}'
     TOKEN_COMMENT_START = '{#'
     TOKEN_COMMENT_END = '#}'
-    FUNC_WHITELIST = const.TEMPLATE_BUILTIN_FUNC_WHITELIST
+    FUNC_WHITELIST = TEMPLATE_BUILTIN_FUNC_WHITELIST
 
     def __init__(self, text, context=None,
                  pre_compile=True,
