@@ -4,6 +4,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 import cgi
 from collections import defaultdict
+from Cookie import SimpleCookie
 import json
 
 from .const import HTTP_STATUS_CODES
@@ -57,7 +58,16 @@ class Request(object):
 
     @property
     def cookies(self):
-        raise NotImplementedError
+        """Request cookies
+
+        :rtype: dict
+        """
+        http_cookie = self.environ.get('HTTP_COOKIE', '')
+        _cookies = {
+            k: v.value
+            for k, v in SimpleCookie(http_cookie)
+        }
+        return _cookies
 
     @property
     def headers(self):
@@ -123,16 +133,25 @@ class Response(object):
     def __init__(self, content='', status_code=200, content_type='text/html',
                  headers=None):
         self.content = content
-        self.status_code = status_code
+        self._status_code = status_code
         if headers is None:
             self._headers = {}
         else:
             self._headers = headers
         self._headers['Content-Type'] = content_type
+        self._cookies = {}
+
+    @property
+    def status_code(self):
+        return self._status_code
+
+    @status_code.setter
+    def status_code(self, value):
+        self._status_code = value
 
     @property
     def status(self):
-        code = self.status_code
+        code = self._status_code
         try:
             mean = HTTP_STATUS_CODES[code].upper()
         except KeyError:
@@ -152,12 +171,15 @@ class Response(object):
         self._headers['Content-Type'] = value
 
     def set_cookie(self, key, value='', max_age=None, expires=None, path='/',
-                   domain=None, secure=None, httponly=False):
+                   domain=None, secure=False, httponly=False):
         cookie = cookie_dump(
             key, value=value, max_age=max_age, expires=expires, path=path,
             domain=domain, secure=secure, httponly=httponly
         )
-        self._headers.setdefault('Set-Cookie', []).append(cookie)
+        self._cookies[key] = cookie
+
+    def delete_cookie(self, key):
+        self._cookies.pop(key, None)
 
 
 def parse_query_string(query_string, encoding='utf-8'):
@@ -171,5 +193,16 @@ def parse_query_string(query_string, encoding='utf-8'):
 
 
 def cookie_dump(key, value='', max_age=None, expires=None, path='/',
-                domain=None, secure=None, httponly=False):
-    raise NotImplementedError
+                domain=None, secure=False, httponly=False):
+    """
+    :rtype: ``Cookie.SimpleCookie``
+    """
+    cookie = SimpleCookie()
+    cookie[key] = value
+    for attr in ('max_age', 'expires', 'path', 'domain',
+                 'secure', 'httponly'):
+        attr_key = attr.replace('_', '-')
+        attr_value = locals()[attr]
+        if attr_value:
+            cookie[key][attr_key] = attr_value
+    return cookie
