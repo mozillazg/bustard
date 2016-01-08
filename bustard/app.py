@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, print_function, unicode_literals
 
-import httplib
+from collections import namedtuple
+import os
 
+from .http import Request, Response, response_status_string
 from .router import Router
+from .template import Template
 from .wsgi_server import make_server
 
 NOTFOUND_HTML = """
@@ -12,41 +15,83 @@ NOTFOUND_HTML = """
     <h1>404 Not Found</h1>
 </html>
 """
+ResponseData = namedtuple('ResponseData', 'status body headers_list')
 
 
 class Bustard(object):
-    def __init__(self):
+    def __init__(self, name='', template_dir='',
+                 template_default_context=None):
+        self.name = name
         self._route = Router()
+        self.template_dir = template_dir
+        if template_default_context is not None:
+            self.template_default_context = template_default_context
+        else:
+            self.template_default_context = {}
+        self.template_default_context.setdefault('url_for', self.url_for)
+        self._before_request_hooks = []
+        self._after_request_hooks = []
+
+    def render_template(self, template_name, **kwargs):
+        return render_template(
+            template_name, template_dir=self.template_dir,
+            default_context=self.template_default_context,
+            context=kwargs
+        )
+
+    def url_for(self, func_name):
+        return self._route.url_for(func_name)
 
     def __call__(self, environ, start_response):
         """for wsgi server"""
         self.start_response = start_response
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
-
-        print(path, method)
-        print(self._route.methods)
         func = self._route.get_func(path, method)
 
         if func is None:
             return self.notfound()
+        self.request = Request(environ)
+        response_args = self.handle_view(self.request, func)
+        return self.make_response(body=response_args.body,
+                                  code=response_args.status,
+                                  headers=response_args.headers_list)
 
-        result = func()
-        if isinstance(result, (list, tuple)):
-            status, data, headers = result
+    def handle_view(self, request, view_func):
+        response = view_func(request)
+        if isinstance(response, (list, tuple)):
+            return ResponseData(*response)
+        elif isinstance(response, Response):
+            return self._dump_response(response)
         else:
-            status, data, headers = 200, result, None
+            return ResponseData(200, response, None)
 
-        return self.make_response(data, status, headers)
+    def _dump_response(self, response):
+        status = response.status
+        body = response.content
+        headers_list = response.headers.items()
+        cookies = response.cookies
+        for cookie in cookies.values():
+            for value in cookie.values():
+                headers_list.append(('Set-Cookie', value.OutputString()))
+        return ResponseData(status, body, headers_list)
 
     def make_response(self, body, code=200, headers=None,
                       content_type='text/html'):
-        status_code = str(code) + ' ' + httplib.responses.get(code)
-        headers = {} if headers is None else headers
-        headers.setdefault('Content-Type', content_type)
-        header_list = headers.items()
-        self.start_response(status_code, header_list)
-        return [body]
+        if isinstance(code, int):
+            status_code = response_status_string(code)
+        else:
+            status_code = str(code)
+
+        if isinstance(headers, dict):
+            headers.setdefault('Content-Type', content_type)
+            headers_list = headers.items()
+        elif isinstance(headers, (tuple, list)):
+            headers_list = headers
+        else:
+            headers_list = ()
+        self.start_response(status_code, headers_list)
+        return iter(body)
 
     def route(self, path, methods=None):
 
@@ -56,6 +101,14 @@ class Bustard(object):
 
         return wrapper
 
+    def before_request(self, func):
+        self._before_request_hooks.append(func)
+        return func
+
+    def after_request(self, func):
+        self._after_request_hooks.append(func)
+        return func
+
     def notfound(self):
         return self.make_response(NOTFOUND_HTML, code=404)
 
@@ -64,3 +117,11 @@ class Bustard(object):
         httpd = make_server(address, self)
         print('WSGIServer: Serving HTTP on %s ...\n' % str(address))
         httpd.serve_forever()
+
+
+def render_template(template_name, template_dir='', default_context=None,
+                    context=None, **kwargs):
+    with open(os.path.join(template_dir, template_name)) as f:
+        return Template(f.read(), context=default_context,
+                        template_dir=template_dir, **kwargs
+                        ).render(context=context)
