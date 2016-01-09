@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import absolute_import
 
 import datetime
 import socket
@@ -70,7 +70,7 @@ class WSGIServer(object):
             self.client_connection.close()
 
     def handle_one_request(self):
-        self.client_connection, client_address = self.socket.accept()
+        self.client_connection, self.client_address = self.socket.accept()
         # self.raw_request = raw_request = self.client_connection.recv(65537)
         self.raw_request = raw_request = self.client_connection.recv(65536)
 
@@ -116,10 +116,13 @@ class WSGIServer(object):
         env['PATH_INFO'] = urllib.unquote(path)
         env['QUERY_STRING'] = query
 
-        env['CONTENT_TYPE'] = self.headers.get('Content-Type')
-        env['CONTENT_LENGTH'] = self.headers.get('Content-Length')
+        env['CONTENT_TYPE'] = self.headers.get('Content-Type', '')
+        env['CONTENT_LENGTH'] = self.headers.get('Content-Length', '')
 
         env['SERVER_PROTOCOL'] = self.request_version
+        env['REMOTE_ADDR'] = self.client_address[0]
+        env['REMOTE_PORT'] = self.client_address[1]
+
         env['wsgi.version'] = (1, 0)
         env['wsgi.url_scheme'] = 'http'
         env['wsgi.input'] = StringIO.StringIO(self.raw_request)
