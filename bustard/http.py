@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import absolute_import
 
 import cgi
 from collections import defaultdict
@@ -23,6 +23,17 @@ class Request(object):
     @property
     def path(self):
         return self.environ['PATH_INFO']
+
+    @property
+    def url(self):
+        netloc = self.environ['HTTP_HOST']
+        return '{scheme}://{netloc}{path}'.format(
+            scheme='http', netloc=netloc, path=self.path
+        )
+
+    @property
+    def remote_addr(self):
+        return self.environ.get('REMOTE_ADDR', '')
 
     def parse_form_data(self):
         if hasattr(self, '_form'):
@@ -72,7 +83,7 @@ class Request(object):
     @property
     def headers(self):
         return {
-            key: value
+            to_header_key(key.replace('HTTP_', '', 1).replace('_', '-')): value
             for key, value in self.environ.items()
             if key.startswith('HTTP_')
         }
@@ -138,8 +149,16 @@ class Response(object):
             self._headers = {}
         else:
             self._headers = headers
-        self._headers['Content-Type'] = content_type
+        self._headers.setdefault('Content-Type', content_type)
         self._cookies = {}
+
+    @property
+    def data(self):
+        return self._content
+
+    @data.setter
+    def data(self, value):
+        self._content = value
 
     @property
     def content(self):
@@ -148,6 +167,7 @@ class Response(object):
     @content.setter
     def content(self, value):
         self._content = value.encode('utf-8')
+        self.headers['Content-Type'] = value
 
     @property
     def status_code(self):
@@ -222,9 +242,16 @@ def response_status_string(code):
     return '{code} {mean}'.format(code=code, mean=mean)
 
 
-def jsonify():
-    raise NotImplementedError
+def jsonify(obj=None, indent=2, sort_keys=True, **kwargs):
+    if obj:
+        kwargs = obj
+    data = json.dumps(kwargs, indent=indent, sort_keys=sort_keys)
+    return Response(data, content_type='application/json')
 
 
-def redirect():
-    raise NotImplementedError
+def redirect(*args, **kwargs):
+    pass
+
+
+def to_header_key(key):
+    return '-'.join(x.capitalize() for x in key.split('-'))

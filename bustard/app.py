@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import absolute_import
 
 from collections import namedtuple
 import os
@@ -37,7 +37,7 @@ class Bustard(object):
             template_name, template_dir=self.template_dir,
             default_context=self.template_default_context,
             context=kwargs
-        )
+        ).encode('utf-8')
 
     def url_for(self, func_name):
         return self._route.url_for(func_name)

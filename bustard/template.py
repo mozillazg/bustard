@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import absolute_import
 
 """
 简单的模板引擎
@@ -18,7 +18,6 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 """
 import __builtin__
-from copy import deepcopy
 import os
 import re
 
@@ -214,7 +213,7 @@ class Template(object):
 
     def render(self, context=None):
         """使用 context 字典渲染模板"""
-        _context = deepcopy(self.context)
+        _context = self.context.copy()
         if context is not None:
             _context.update(context)
 
