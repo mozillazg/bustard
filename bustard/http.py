@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 import cgi
 from collections import defaultdict
-from Cookie import SimpleCookie
+from http.cookies import SimpleCookie
 import json
 
 from .constants import HTTP_STATUS_CODES
@@ -42,14 +42,15 @@ class Request(object):
         fields = cgi.FieldStorage(fp=self.stream, environ=self.environ)
         _form = {}
         _files = {}
-        for key in fields:
-            value = fields[key]
-            if isinstance(value, list):
-                _form[key] = [x.value for x in value]
-            elif getattr(value, 'filename', None) is not None:
-                _files[key] = value
-            else:
-                _form[key] = [value.value]
+        if fields.length > 0:
+            for key in fields:
+                values = fields[key]
+                if isinstance(values, list):
+                    _form[key] = [x.value for x in values]
+                elif getattr(values, 'filename', None) is not None:
+                    _files[key] = values
+                else:
+                    _form[key] = [values.value]
         self._form = _form
         self._files = _files
 
@@ -92,7 +93,7 @@ class Request(object):
     def data(self, as_text=False, encoding='utf-8'):
         if hasattr(self, '_content'):
             return self._content
-        content = self.stream.read()
+        content = self.stream.read(int(self.content_length or 0))
         self._content = content
         if as_text:
             content = content.decode(encoding)
@@ -141,7 +142,7 @@ class Request(object):
 
 class Response(object):
 
-    def __init__(self, content='', status_code=200, content_type='text/html',
+    def __init__(self, content=b'', status_code=200, content_type='text/html',
                  headers=None):
         self._content = content
         self._status_code = status_code
@@ -167,6 +168,13 @@ class Response(object):
     @content.setter
     def content(self, value):
         self._content = value.encode('utf-8')
+
+    @property
+    def content_type(self, value):
+        return self.headers.get('Content-Type', '')
+
+    @content_type.setter
+    def content_type(self, value):
         self.headers['Content-Type'] = value
 
     @property
@@ -246,7 +254,9 @@ def jsonify(obj=None, indent=2, sort_keys=True, **kwargs):
     if obj:
         kwargs = obj
     data = json.dumps(kwargs, indent=indent, sort_keys=sort_keys)
-    return Response(data, content_type='application/json')
+    response = Response(content_type='application/json')
+    response.content = data
+    return response
 
 
 def redirect(*args, **kwargs):

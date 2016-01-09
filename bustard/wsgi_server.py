@@ -3,8 +3,8 @@
 from __future__ import absolute_import
 
 import datetime
+import io
 import socket
-import StringIO
 import sys
 import time
 import urllib
@@ -125,7 +125,7 @@ class WSGIServer(object):
 
         env['wsgi.version'] = (1, 0)
         env['wsgi.url_scheme'] = 'http'
-        env['wsgi.input'] = StringIO.StringIO(self.raw_request)
+        env['wsgi.input'] = io.BytesIO(self.raw_request)
         env['wsgi.errors'] = sys.stderr
         env['wsgi.multithread'] = False
         env['wsgi.multiprocess'] = True
@@ -149,7 +149,7 @@ class WSGIServer(object):
             try:
                 if self.headers_set:
                     # Re-raise original exception if headers sent
-                    raise exc_info[0], exc_info[1], exc_info[2]
+                    raise (exc_info[0], exc_info[1], exc_info[2])
             finally:
                 exc_info = None     # avoid dangling circular ref
 

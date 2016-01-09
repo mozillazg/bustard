@@ -17,7 +17,7 @@ from __future__ import absolute_import
 * include: {% include "path/to/b.tpl" %}
 
 """
-import __builtin__
+import builtins
 import os
 import re
 
@@ -55,7 +55,7 @@ class CodeBuilder(object):
     def _compile(self):
         """编译生成的代码"""
         assert self.indent_level == 0
-        self._code = compile(unicode(self), '<source>', 'exec')
+        self._code = compile(str(self), '<source>', 'exec')
         return self._code
 
     def get_namespace(self):
@@ -64,11 +64,8 @@ class CodeBuilder(object):
         exec(self._code, namespace)
         return namespace
 
-    def __unicode__(self):
-        return ''.join(unicode(s) for s in self.source_code)
-
     def __str__(self):
-        return str(self.__unicode__())
+        return ''.join(str(s) for s in self.source_code)
 
 
 class Template(object):
@@ -88,7 +85,7 @@ class Template(object):
                  result_var='result',
                  ):
         self.context = {k: v
-                        for k, v in __builtin__.__dict__.iteritems()
+                        for k, v in builtins.__dict__.items()
                         if k in self.FUNC_WHITELIST
                         }
         self.base_dir = template_dir
@@ -150,7 +147,7 @@ class Template(object):
                                               self.TOKEN_EXPR_END).strip()
                 global_var = self.collect_var(global_var)
 
-                self.buffered.append('unicode(%s)' % self.wrap_var(global_var))
+                self.buffered.append('str(%s)' % self.wrap_var(global_var))
 
             # {% blala %}
             elif token.startswith(self.TOKEN_TAG_START):
@@ -224,7 +221,7 @@ class Template(object):
         up_vars = set()
         up_vars.update(self.up_vars)
         up_vars.update(self.global_vars)
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             _code = Template(
                 f.read(), self.context,
                 pre_compile=False, indent=self.code.indent_level,

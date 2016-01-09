@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 import collections
+import functools
 import operator
 
 
@@ -29,7 +30,7 @@ class Router(object):
                 return func
 
     def url_for(self, func_name):
-        values = reduce(operator.add, self.methods.values())
+        values = functools.reduce(operator.add, self.methods.values())
         for path, func in values:
             if func.__name__ == func_name:
                 return path

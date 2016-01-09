@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
-from collections import namedtuple
+import collections
 import os
 
 from .http import Request, Response, response_status_string
@@ -15,7 +15,9 @@ NOTFOUND_HTML = """
     <h1>404 Not Found</h1>
 </html>
 """
-ResponseData = namedtuple('ResponseData', 'status body headers_list')
+ResponseData = collections.namedtuple(
+    'ResponseData', 'status body headers_list'
+)
 
 
 class Bustard(object):
@@ -78,6 +80,9 @@ class Bustard(object):
 
     def make_response(self, body, code=200, headers=None,
                       content_type='text/html'):
+        if isinstance(body, str):
+            body = str.encode('utf-8')
+
         if isinstance(code, int):
             status_code = response_status_string(code)
         else:
@@ -86,12 +91,12 @@ class Bustard(object):
         if isinstance(headers, dict):
             headers.setdefault('Content-Type', content_type)
             headers_list = headers.items()
-        elif isinstance(headers, (tuple, list)):
+        elif isinstance(headers, collections.Iterable):
             headers_list = headers
         else:
-            headers_list = ()
+            headers_list = (('Content-Type', content_type),)
         self.start_response(status_code, headers_list)
-        return iter(body)
+        return [body]
 
     def route(self, path, methods=None):
 
@@ -121,7 +126,8 @@ class Bustard(object):
 
 def render_template(template_name, template_dir='', default_context=None,
                     context=None, **kwargs):
-    with open(os.path.join(template_dir, template_name)) as f:
+    with open(os.path.join(template_dir, template_name),
+              encoding='utf-8') as f:
         return Template(f.read(), context=default_context,
                         template_dir=template_dir, **kwargs
                         ).render(context=context)
