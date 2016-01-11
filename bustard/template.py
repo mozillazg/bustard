@@ -210,7 +210,8 @@ class Template(object):
 
     def render(self, context=None):
         """使用 context 字典渲染模板"""
-        _context = self.context.copy()
+        _context = {}
+        _context.update(self.context)
         if context is not None:
             _context.update(context)
 
