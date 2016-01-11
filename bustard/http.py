@@ -35,6 +35,18 @@ class Request(object):
     def remote_addr(self):
         return self.environ.get('REMOTE_ADDR', '')
 
+    @property
+    def form(self):
+        if self.method not in ['POST', 'PUT'] or (
+                self.content_type not in [
+                    'application/x-www-form-urlencoded',
+                    'multipart/form-data',
+                ]
+        ):
+            return {}
+        self.parse_form_data()
+        return self._form
+
     def parse_form_data(self):
         if hasattr(self, '_form'):
             return
@@ -55,11 +67,6 @@ class Request(object):
         self._files = _files
 
     @property
-    def form(self):
-        self.parse_form_data()
-        return self._form
-
-    @property
     def args(self):
         query_string = self.environ['QUERY_STRING']
         return parse_query_string(query_string)
@@ -77,23 +84,37 @@ class Request(object):
         http_cookie = self.environ.get('HTTP_COOKIE', '')
         _cookies = {
             k: v.value
-            for k, v in SimpleCookie(http_cookie)
+            for (k, v) in SimpleCookie(http_cookie).items()
         }
         return _cookies
 
     @property
     def headers(self):
-        return {
+        _headers = {
             to_header_key(key.replace('HTTP_', '', 1).replace('_', '-')): value
             for key, value in self.environ.items()
             if key.startswith('HTTP_')
         }
+        content_type = self.content_type
+        content_length = self.content_length
+        if content_type:
+            _headers.setdefault('Content-Type', self.content_type)
+        if content_length:
+            _headers.setdefault('Content-Length', self.content_length)
+        return _headers
 
     @property
     def data(self, as_text=False, encoding='utf-8'):
         if hasattr(self, '_content'):
             return self._content
-        content = self.stream.read(int(self.content_length or 0))
+
+        if self.content_type in [
+            'application/x-www-form-urlencoded',
+            'multipart/form-data',
+        ]:
+            content = b''
+        else:
+            content = self.stream.read(int(self.content_length or 0))
         self._content = content
         if as_text:
             content = content.decode(encoding)
@@ -101,6 +122,8 @@ class Request(object):
 
     @property
     def files(self):
+        if self.method not in ['POST', 'PUT']:
+            return {}
         self.parse_form_data()
         return self._files
 
@@ -224,7 +247,7 @@ def parse_query_string(query_string, encoding='utf-8'):
         if '=' not in query_item:
             continue
         keyword, value = query_item.split('=', 1)
-        query_dict[keyword].append(value.decode(encoding))
+        query_dict[keyword].append(value)
     return query_dict
 
 
