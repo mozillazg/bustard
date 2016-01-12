@@ -248,9 +248,12 @@ class Template(object):
         if (not var) or var.startswith('"') or var.startswith('\''):
             return
 
-        _vars = re.split(r'[^\w"\']+', var)
+        _vars = re.split(r'[\s\(]+', var)
         if len(_vars) > 1:   # {% if len(foobar) %}
             for _var in _vars:
+                _var = _var.strip()
+                if re.match(r'^\w+\s*=', _var):   # {{ foobar(abc=1) }}
+                    continue
                 self._collect_var(_var, collect)
         elif re.match(r'^[a-zA-Z_](\w+)?', _vars[0]):
             collect.add(_vars[0])
