@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 
 import cgi
-from collections import defaultdict
+import collections
 from http.cookies import SimpleCookie
 import json
 
@@ -101,7 +101,7 @@ class Request(object):
             _headers.setdefault('Content-Type', self.content_type)
         if content_length:
             _headers.setdefault('Content-Length', self.content_length)
-        return _headers
+        return Header(_headers)
 
     @property
     def data(self, as_text=False, encoding='utf-8'):
@@ -165,24 +165,18 @@ class Request(object):
 
 class Response(object):
 
-    def __init__(self, content=b'', status_code=200, content_type='text/html',
+    def __init__(self, content=b'', status_code=200,
+                 content_type='text/html; charset=utf-8',
                  headers=None):
         self._content = content
         self._status_code = status_code
         if headers is None:
-            self._headers = {}
+            _headers = {}
         else:
-            self._headers = headers
-        self._headers.setdefault('Content-Type', content_type)
+            _headers = headers
+        _headers.setdefault('Content-Type', content_type)
+        self._headers = Header(_headers)
         self._cookies = {}
-
-    @property
-    def data(self):
-        return self._content
-
-    @data.setter
-    def data(self, value):
-        self._content = value
 
     @property
     def content(self):
@@ -190,7 +184,10 @@ class Response(object):
 
     @content.setter
     def content(self, value):
-        self._content = value.encode('utf-8')
+        if isinstance(value, str):
+            value = value.encode('utf-8')
+        self._content = value
+    data = content
 
     @property
     def content_type(self, value):
@@ -217,6 +214,10 @@ class Response(object):
     def headers(self):
         return self._headers
 
+    @headers.setter
+    def headers(self, value):
+        self._headers = value
+
     @property
     def content_type(self):
         return self._headers['Content-Type']
@@ -242,7 +243,7 @@ class Response(object):
 
 
 def parse_query_string(query_string, encoding='utf-8'):
-    query_dict = defaultdict(list)
+    query_dict = collections.defaultdict(list)
     for query_item in query_string.split('&'):
         if '=' not in query_item:
             continue
@@ -273,12 +274,10 @@ def response_status_string(code):
     return '{code} {mean}'.format(code=code, mean=mean)
 
 
-def jsonify(obj=None, indent=2, sort_keys=True, **kwargs):
-    if obj:
-        kwargs = obj
-    data = json.dumps(kwargs, indent=indent, sort_keys=sort_keys)
-    response = Response(content_type='application/json')
-    response.content = data
+def jsonify(*args, **kwargs):
+    data = json.dumps(dict(*args, **kwargs), indent=2, sort_keys=True)
+    data = data.encode('utf-8')
+    response = Response(data + b'\n', content_type='application/json')
     return response
 
 
@@ -288,3 +287,27 @@ def redirect(*args, **kwargs):
 
 def to_header_key(key):
     return '-'.join(x.capitalize() for x in key.split('-'))
+
+
+class Header(collections.UserDict):
+
+    def __getitem__(self, key):
+        key = to_header_key(key)
+        return self.data[key][-1]
+
+    def __setitem__(self, key, value):
+        key = to_header_key(key)
+        if isinstance(value, (str, bytes)):
+            self.data[key] = [value]
+        else:
+            self.data[key] = value
+
+    def add(self, key, value):
+        key = to_header_key(key)
+        self.data.setdefault(key, []).append(value)
+
+    def set(self, key, value):
+        self.__setitem__(key, value)
+
+    def get_all(self, key):
+        return self.data[key]
