@@ -38,3 +38,25 @@ def parse_query_string(query_string, encoding='utf-8'):
         keyword, value = query_item.split('=', 1)
         query_dict[keyword].append(urllib.parse.unquote_plus(value))
     return query_dict
+
+
+def to_header_key(key):
+    return '-'.join(x.capitalize() for x in key.split('-'))
+
+
+def to_text(s, encoding='utf-8'):
+    if isinstance(s, str):
+        return s
+    elif isinstance(s, collections.ByteString):
+        return s.decode(encoding)
+    else:
+        return str(s)
+
+
+def to_bytes(b, encoding='utf-8'):
+    if isinstance(b, collections.ByteString):
+        return b
+    elif isinstance(b, str):
+        return b.encode(encoding)
+    else:
+        return bytes(b)
