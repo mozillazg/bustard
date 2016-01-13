@@ -8,8 +8,8 @@ import json
 
 from .constants import HTTP_STATUS_CODES
 from .utils import (
-    json_dumps_default, MultiDict, parse_query_string, to_header_key,
-    to_text
+    json_dumps_default, MultiDict, parse_query_string,
+    to_header_key, to_text, parse_basic_auth_header
 )
 
 
@@ -172,6 +172,13 @@ class Request(object):
         requested_with = self.headers.get('HTTP_X_REQUESTED_WITH', '').lower()
         return requested_with == 'xmlhttprequest'
 
+    @property
+    def authorization(self):
+        headers = self.headers
+        auth_header_value = headers.get('Authorization', '')
+        if len(auth_header_value.split()) > 1:
+            return parse_basic_auth_header(auth_header_value)
+
 
 class Response(object):
 
@@ -226,7 +233,7 @@ class Response(object):
 
     @headers.setter
     def headers(self, value):
-        self._headers = value
+        self._headers = Header(value)
 
     @property
     def content_type(self):

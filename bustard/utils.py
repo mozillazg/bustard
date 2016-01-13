@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import base64
 import collections
 import urllib
 
@@ -60,3 +61,20 @@ def to_bytes(b, encoding='utf-8'):
         return b.encode(encoding)
     else:
         return bytes(b)
+
+
+class Authorization:
+
+    def __init__(self, _type, data_dict):
+        self.type = _type
+        self.username = data_dict.get('username')
+        self.password = data_dict.get('password')
+
+
+def parse_basic_auth_header(value):
+    auth_type, auth_info = to_bytes(value).split(None, 1)
+    auth_type = auth_type.lower()
+    if auth_type == b'basic':
+        username, password = base64.b64decode(auth_info).split(b':', 1)
+        return Authorization(auth_type, {'username': to_text(username),
+                                         'password': to_text(password)})
