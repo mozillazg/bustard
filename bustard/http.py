@@ -7,7 +7,10 @@ from http.cookies import SimpleCookie
 import json
 
 from .constants import HTTP_STATUS_CODES
-from .utils import json_dumps_default, MultiDict, parse_query_string
+from .utils import (
+    json_dumps_default, MultiDict, parse_query_string, to_header_key,
+    to_text
+)
 
 
 class Request(object):
@@ -25,10 +28,17 @@ class Request(object):
         return self.environ['PATH_INFO']
 
     @property
+    def host(self):
+        return self.environ['HTTP_HOST']
+
+    @property
+    def scheme(self):
+        return self.environ['wsgi.url_scheme']
+
+    @property
     def url(self):
-        netloc = self.environ['HTTP_HOST']
-        return '{scheme}://{netloc}{path}'.format(
-            scheme='http', netloc=netloc, path=self.path
+        return '{scheme}://{host}{path}'.format(
+            scheme=self.scheme, host=self.host, path=self.path
         )
 
     @property
@@ -187,7 +197,7 @@ class Response(object):
         if isinstance(value, str):
             value = value.encode('utf-8')
         self._content = value
-    data = content
+    body = data = content
 
     @property
     def content_type(self, value):
@@ -238,8 +248,26 @@ class Response(object):
         )
         self._cookies[key] = cookie
 
-    def delete_cookie(self, key):
-        self._cookies.pop(key, None)
+    def delete_cookie(self, key, max_age=0,
+                      expires='Thu, 01-Jan-1970 00:00:00 GMT'):
+        self.set_cookie(key, value='', max_age=max_age, expires=expires)
+
+    @property
+    def headers_list(self):
+        # normal headers
+        headers_list = [
+            (k, v)
+            for k, values in self.headers.to_dict().items()
+            for v in values
+        ]
+
+        # set-cookies
+        headers_list.extend(
+            ('Set-Cookie', value.OutputString())
+            for cookie in self.cookies.values()
+            for value in cookie.values()
+        )
+        return headers_list
 
 
 def cookie_dump(key, value='', max_age=None, expires=None, path='/',
@@ -248,7 +276,7 @@ def cookie_dump(key, value='', max_age=None, expires=None, path='/',
     :rtype: ``Cookie.SimpleCookie``
     """
     cookie = SimpleCookie()
-    cookie[key.encode('utf-8')] = value.encode('utf-8')
+    cookie[key] = value
     for attr in ('max_age', 'expires', 'path', 'domain',
                  'secure', 'httponly'):
         attr_key = attr.replace('_', '-')
@@ -279,14 +307,11 @@ def redirect(url, code=302):
     return response
 
 
-def to_header_key(key):
-    return '-'.join(x.capitalize() for x in key.split('-'))
-
-
 class Header(MultiDict):
 
     def add(self, key, value):
-        key = to_header_key(key)
+        key = to_text(to_header_key(key))
+        value = to_text(value)
         if isinstance(value, (tuple, list)):
             self.data.setdefault(key, []).extend(value)
         else:
@@ -302,7 +327,8 @@ class Header(MultiDict):
         return self.data[key][-1]
 
     def __setitem__(self, key, value):
-        key = to_header_key(key)
+        key = to_text(to_header_key(key))
+        value = to_text(value)
         if not isinstance(value, (list, tuple)):
             self.data[key] = [value]
         else:
