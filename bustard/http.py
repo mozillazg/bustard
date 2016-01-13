@@ -3,11 +3,11 @@
 from __future__ import absolute_import
 
 import cgi
-import collections
 from http.cookies import SimpleCookie
 import json
 
 from .constants import HTTP_STATUS_CODES
+from .utils import json_dumps_default, MultiDict, parse_query_string
 
 
 class Request(object):
@@ -69,7 +69,7 @@ class Request(object):
     @property
     def args(self):
         query_string = self.environ['QUERY_STRING']
-        return parse_query_string(query_string)
+        return MultiDict(parse_query_string(query_string))
 
     @property
     def values(self):
@@ -242,16 +242,6 @@ class Response(object):
         self._cookies.pop(key, None)
 
 
-def parse_query_string(query_string, encoding='utf-8'):
-    query_dict = collections.defaultdict(list)
-    for query_item in query_string.split('&'):
-        if '=' not in query_item:
-            continue
-        keyword, value = query_item.split('=', 1)
-        query_dict[keyword].append(value)
-    return query_dict
-
-
 def cookie_dump(key, value='', max_age=None, expires=None, path='/',
                 domain=None, secure=False, httponly=False):
     """
@@ -275,39 +265,45 @@ def response_status_string(code):
 
 
 def jsonify(*args, **kwargs):
-    data = json.dumps(dict(*args, **kwargs), indent=2, sort_keys=True)
+    data = json.dumps(dict(*args, **kwargs), indent=2, sort_keys=True,
+                      separators=(', ', ': '), default=json_dumps_default)
     data = data.encode('utf-8')
     response = Response(data + b'\n', content_type='application/json')
+    response.headers['Content-Length'] = str(len(response.data))
     return response
 
 
-def redirect(*args, **kwargs):
-    pass
+def redirect(url, code=302):
+    response = Response(status_code=code)
+    response.headers['Location'] = url
+    return response
 
 
 def to_header_key(key):
     return '-'.join(x.capitalize() for x in key.split('-'))
 
 
-class Header(collections.UserDict):
-
-    def __getitem__(self, key):
-        key = to_header_key(key)
-        return self.data[key][-1]
-
-    def __setitem__(self, key, value):
-        key = to_header_key(key)
-        if isinstance(value, (str, bytes)):
-            self.data[key] = [value]
-        else:
-            self.data[key] = value
+class Header(MultiDict):
 
     def add(self, key, value):
         key = to_header_key(key)
-        self.data.setdefault(key, []).append(value)
+        if isinstance(value, (tuple, list)):
+            self.data.setdefault(key, []).extend(value)
+        else:
+            self.data.setdefault(key, []).append(value)
 
     def set(self, key, value):
         self.__setitem__(key, value)
 
     def get_all(self, key):
         return self.data[key]
+
+    def __getitem__(self, key):
+        return self.data[key][-1]
+
+    def __setitem__(self, key, value):
+        key = to_header_key(key)
+        if not isinstance(value, (list, tuple)):
+            self.data[key] = [value]
+        else:
+            self.data[key] = value
