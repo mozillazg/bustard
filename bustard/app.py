@@ -8,6 +8,7 @@ import os
 from .http import Request, Response, response_status_string
 from .router import Router
 from .template import Template
+from .utils import to_bytes
 from .wsgi_server import make_server
 
 NOTFOUND_HTML = """
@@ -15,9 +16,6 @@ NOTFOUND_HTML = """
     <h1>404 Not Found</h1>
 </html>
 """
-ResponseData = collections.namedtuple(
-    'ResponseData', 'status body headers_list'
-)
 
 
 class Bustard(object):
@@ -41,8 +39,12 @@ class Bustard(object):
             context=kwargs
         ).encode('utf-8')
 
-    def url_for(self, func_name, **kwargs):
-        return self._route.url_for(func_name, **kwargs)
+    def url_for(self, func_name, _external=False, **kwargs):
+        url = self._route.url_for(func_name, **kwargs)
+        if _external:
+            request = self.request
+            url = '{}://{}{}'.format(request.scheme, request.host, url)
+        return url
 
     def __call__(self, environ, start_response):
         """for wsgi server"""
@@ -56,32 +58,25 @@ class Bustard(object):
             return self.abort(405)
 
         self.request = Request(environ)
-        response_args = self.handle_view(self.request, func, func_kwargs)
-        return self.make_response(body=response_args.body,
-                                  code=response_args.status,
-                                  headers=response_args.headers_list)
+        response = self.handle_view(self.request, func, func_kwargs)
+        return self._make_response(body=response.body,
+                                   code=response.status_code,
+                                   headers=response.headers_list)
 
     def handle_view(self, request, view_func, func_kwargs):
-        response = view_func(request, **func_kwargs)
-        if isinstance(response, (list, tuple)):
-            return ResponseData(*response)
-        elif isinstance(response, Response):
-            return self._dump_response(response)
+        result = view_func(request, **func_kwargs)
+        if isinstance(result, (list, tuple)):
+            response = Response(content=result[1],
+                                status_code=result[0],
+                                headers=result[2])
+        elif isinstance(result, Response):
+            response = result
         else:
-            return ResponseData(200, response, None)
+            response = Response(result)
+        return response
 
-    def _dump_response(self, response):
-        status = response.status
-        body = response.content
-        headers_list = response.headers.items()
-        cookies = response.cookies
-        for cookie in cookies.values():
-            for value in cookie.values():
-                headers_list.append(('Set-Cookie', value.OutputString()))
-        return ResponseData(status, body, headers_list)
-
-    def make_response(self, body, code=200, headers=None,
-                      content_type='text/html; charset=utf-8'):
+    def _make_response(self, body, code=200, headers=None,
+                       content_type='text/html; charset=utf-8'):
         if isinstance(body, str):
             body = body.encode('utf-8')
 
@@ -98,7 +93,11 @@ class Bustard(object):
         else:
             headers_list = (('Content-Type', content_type),)
         self.start_response(status_code, headers_list)
-        return [body]
+
+        if isinstance(body, collections.Iterator):
+            return (to_bytes(x) for x in body)
+        else:
+            return [body]
 
     def route(self, path, methods=None):
 
@@ -117,10 +116,15 @@ class Bustard(object):
         return func
 
     def notfound(self):
-        return self.make_response(NOTFOUND_HTML, code=404)
+        return self._make_response(NOTFOUND_HTML, code=404)
 
     def abort(self, code):
-        return self.make_response(b'', code=code)
+        return self._make_response(b'', code=code)
+
+    def make_response(self, content=b'', *args, **kwargs):
+        if isinstance(content, Response):
+            return content
+        return Response(content, *args, **kwargs)
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
