@@ -41,26 +41,28 @@ class Bustard(object):
             context=kwargs
         ).encode('utf-8')
 
-    def url_for(self, func_name):
-        return self._route.url_for(func_name)
+    def url_for(self, func_name, **kwargs):
+        return self._route.url_for(func_name, **kwargs)
 
     def __call__(self, environ, start_response):
         """for wsgi server"""
         self.start_response = start_response
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
-        func = self._route.get_func(path, method)
-
+        func, methods, func_kwargs = self._route.get_func(path)
         if func is None:
             return self.notfound()
+        if method not in methods:
+            return self.abort(405)
+
         self.request = Request(environ)
-        response_args = self.handle_view(self.request, func)
+        response_args = self.handle_view(self.request, func, func_kwargs)
         return self.make_response(body=response_args.body,
                                   code=response_args.status,
                                   headers=response_args.headers_list)
 
-    def handle_view(self, request, view_func):
-        response = view_func(request)
+    def handle_view(self, request, view_func, func_kwargs):
+        response = view_func(request, **func_kwargs)
         if isinstance(response, (list, tuple)):
             return ResponseData(*response)
         elif isinstance(response, Response):
@@ -79,9 +81,9 @@ class Bustard(object):
         return ResponseData(status, body, headers_list)
 
     def make_response(self, body, code=200, headers=None,
-                      content_type='text/html'):
+                      content_type='text/html; charset=utf-8'):
         if isinstance(body, str):
-            body = str.encode('utf-8')
+            body = body.encode('utf-8')
 
         if isinstance(code, int):
             status_code = response_status_string(code)
@@ -116,6 +118,9 @@ class Bustard(object):
 
     def notfound(self):
         return self.make_response(NOTFOUND_HTML, code=404)
+
+    def abort(self, code):
+        return self.make_response(b'', code=code)
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
