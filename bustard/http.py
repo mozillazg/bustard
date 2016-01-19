@@ -111,7 +111,7 @@ class Request(object):
             _headers.setdefault('Content-Type', self.content_type)
         if content_length:
             _headers.setdefault('Content-Length', self.content_length)
-        return Header(_headers)
+        return Headers(_headers)
 
     @property
     def data(self, as_text=False, encoding='utf-8'):
@@ -192,7 +192,7 @@ class Response(object):
         else:
             _headers = headers
         _headers.setdefault('Content-Type', content_type)
-        self._headers = Header(_headers)
+        self._headers = Headers(_headers)
         self._cookies = {}
 
     @property
@@ -233,7 +233,7 @@ class Response(object):
 
     @headers.setter
     def headers(self, value):
-        self._headers = Header(value)
+        self._headers = Headers(value)
 
     @property
     def content_type(self):
@@ -314,7 +314,7 @@ def redirect(url, code=302):
     return response
 
 
-class Header(MultiDict):
+class Headers(MultiDict):
 
     def add(self, key, value):
         key = to_text(to_header_key(key))
