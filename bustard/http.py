@@ -330,6 +330,13 @@ class Headers(MultiDict):
     def get_all(self, key):
         return self.data[key]
 
+    @classmethod
+    def from_list(cls, headers_list):
+        headers = cls()
+        for (k, v) in headers_list:
+            headers.add(k, v)
+        return headers
+
     def __getitem__(self, key):
         return self.data[key][-1]
 
