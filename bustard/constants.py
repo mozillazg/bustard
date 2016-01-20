@@ -1,7 +1,4 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 
 # 模板引擎默认支持的内置函数
 TEMPLATE_BUILTIN_FUNC_WHITELIST = (

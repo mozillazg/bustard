@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# import functools
 import itertools
 import io
 import sys

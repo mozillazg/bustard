@@ -1,7 +1,4 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import absolute_import
-
 """
 简单的模板引擎
 
