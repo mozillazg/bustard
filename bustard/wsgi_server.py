@@ -117,7 +117,7 @@ class WSGIServer(object):
         env['QUERY_STRING'] = query
 
         env['CONTENT_TYPE'] = self.headers.get('Content-Type', '')
-        env['CONTENT_LENGTH'] = self.headers.get('Content-Length', '')
+        env['CONTENT_LENGTH'] = self.headers.get('Content-Length', '0')
 
         env['SERVER_PROTOCOL'] = self.request_version
         env['REMOTE_ADDR'] = self.client_address[0]
@@ -138,12 +138,12 @@ class WSGIServer(object):
             env['HTTP_' + k] = v
         return env
 
-    def start_response(self, status, response_headers, exc_info=None):
+    def start_response(self, status, headers, exc_info=None):
         server_headers = [
             ('Date', self.date_time_string()),
             ('Server', self.version_string()),
         ]
-        response_headers = list(response_headers) + server_headers
+        headers = list(headers) + server_headers
 
         if exc_info:
             try:
@@ -153,7 +153,7 @@ class WSGIServer(object):
             finally:
                 exc_info = None     # avoid dangling circular ref
 
-        self.headers_set[:] = [status, response_headers]
+        self.headers_set[:] = [status, headers]
 
     def finish_response(self, body):
         try:

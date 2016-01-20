@@ -47,7 +47,7 @@ class Request(object):
 
     @property
     def form(self):
-        if self.method not in ['POST', 'PUT'] or (
+        if self.method not in ['POST', 'PUT', 'PATCH', 'DELETE'] or (
                 self.content_type not in [
                     'application/x-www-form-urlencoded',
                     'multipart/form-data',
@@ -55,7 +55,7 @@ class Request(object):
         ):
             return {}
         self.parse_form_data()
-        return self._form
+        return MultiDict(self._form)
 
     def parse_form_data(self):
         if hasattr(self, '_form'):
@@ -64,7 +64,7 @@ class Request(object):
         fields = cgi.FieldStorage(fp=self.stream, environ=self.environ)
         _form = {}
         _files = {}
-        if fields.length > 0:
+        if fields.length > 0 and fields.list:
             for key in fields:
                 values = fields[key]
                 if isinstance(values, list):
@@ -105,12 +105,8 @@ class Request(object):
             for key, value in self.environ.items()
             if key.startswith('HTTP_')
         }
-        content_type = self.content_type
-        content_length = self.content_length
-        if content_type:
-            _headers.setdefault('Content-Type', self.content_type)
-        if content_length:
-            _headers.setdefault('Content-Length', self.content_length)
+        _headers.setdefault('Content-Type', self.content_type)
+        _headers.setdefault('Content-Length', self.content_length)
         return Headers(_headers)
 
     @property
@@ -192,7 +188,10 @@ class Response(object):
         else:
             _headers = headers
         _headers.setdefault('Content-Type', content_type)
-        self._headers = Headers(_headers)
+        if isinstance(_headers, Headers):
+            self._headers = _headers
+        else:
+            self._headers = Headers(_headers)
         self._cookies = {}
 
     @property
@@ -206,6 +205,9 @@ class Response(object):
         self._content = value
     body = data = content
 
+    def get_data(self):
+        return self._content
+
     @property
     def content_type(self, value):
         return self.headers.get('Content-Type', '')
@@ -213,6 +215,10 @@ class Response(object):
     @content_type.setter
     def content_type(self, value):
         self.headers['Content-Type'] = value
+
+    @property
+    def content_length(self):
+        return int(self.headers.get('Content-Length', '0'))
 
     @property
     def status_code(self):
@@ -237,7 +243,7 @@ class Response(object):
 
     @property
     def content_type(self):
-        return self._headers['Content-Type']
+        return self._headers.get('Content-Type', '')
 
     @content_type.setter
     def content_type(self, value):
@@ -262,11 +268,7 @@ class Response(object):
     @property
     def headers_list(self):
         # normal headers
-        headers_list = [
-            (k, v)
-            for k, values in self.headers.to_dict().items()
-            for v in values
-        ]
+        headers_list = list(self.headers.to_list())
 
         # set-cookies
         headers_list.extend(
@@ -328,6 +330,7 @@ class Headers(MultiDict):
         self.__setitem__(key, value)
 
     def get_all(self, key):
+        key = to_header_key(key)
         return self.data[key]
 
     @classmethod
@@ -337,13 +340,17 @@ class Headers(MultiDict):
             headers.add(k, v)
         return headers
 
+    def to_list(self):
+        return [
+            (k, v)
+            for k, values in self.to_dict().items()
+            for v in values
+        ]
+
     def __getitem__(self, key):
-        return self.data[key][-1]
+        key = to_header_key(key)
+        return super(Headers, self).__getitem__(key)
 
     def __setitem__(self, key, value):
         key = to_text(to_header_key(key))
-        value = to_text(value)
-        if not isinstance(value, (list, tuple)):
-            self.data[key] = [value]
-        else:
-            self.data[key] = value
+        super(Headers, self).__setitem__(key, value)

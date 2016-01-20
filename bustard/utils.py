@@ -17,9 +17,10 @@ class MultiDict(collections.UserDict):
 
     def __setitem__(self, key, value):
         if not isinstance(value, (list, tuple)):
+            value = to_text(value)
             self.data[key] = [value]
         else:
-            self.data[key] = value
+            self.data[key] = list(map(to_text, value))
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.data)
@@ -37,7 +38,8 @@ def parse_query_string(query_string, encoding='utf-8'):
         if '=' not in query_item:
             continue
         keyword, value = query_item.split('=', 1)
-        query_dict[keyword].append(urllib.parse.unquote_plus(value))
+        value = urllib.parse.unquote_plus(value)
+        query_dict[keyword].append(to_text(value, encoding=encoding))
     return query_dict
 
 

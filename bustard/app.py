@@ -8,6 +8,7 @@ import os
 from .http import Request, Response, response_status_string
 from .router import Router
 from .template import Template
+from .testing import Client
 from .utils import to_bytes
 from .wsgi_server import make_server
 
@@ -39,26 +40,35 @@ class Bustard(object):
             context=kwargs
         ).encode('utf-8')
 
-    def url_for(self, func_name, _external=False, **kwargs):
+    def url_for(self, func_name, _request=None, _external=False, **kwargs):
         url = self._route.url_for(func_name, **kwargs)
         if _external:
-            request = self.request
+            request = _request
             url = '{}://{}{}'.format(request.scheme, request.host, url)
         return url
+
+    def url_resolve(self, path):
+        """url -> view
+
+        :return: (func, methods, func_kwargs)
+        """
+        return self._route.get_func(path)
 
     def __call__(self, environ, start_response):
         """for wsgi server"""
         self.start_response = start_response
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
-        func, methods, func_kwargs = self._route.get_func(path)
+        func, methods, func_kwargs = self.url_resolve(path)
         if func is None:
             return self.notfound()
         if method not in methods:
             return self.abort(405)
 
-        self.request = Request(environ)
-        response = self.handle_view(self.request, func, func_kwargs)
+        request = Request(environ)
+        response = self.handle_view(request, func, func_kwargs)
+        self.handle_after_request_hooks(request, response)
+
         return self._make_response(body=response.body,
                                    code=response.status_code,
                                    headers=response.headers_list)
@@ -115,6 +125,10 @@ class Bustard(object):
         self._after_request_hooks.append(func)
         return func
 
+    def handle_after_request_hooks(self, request, response):
+        for func in self._after_request_hooks:
+            func(request, response)
+
     def notfound(self):
         return self._make_response(NOTFOUND_HTML, code=404)
 
@@ -125,6 +139,9 @@ class Bustard(object):
         if isinstance(content, Response):
             return content
         return Response(content, *args, **kwargs)
+
+    def test_client(self):
+        return Client(self)
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
