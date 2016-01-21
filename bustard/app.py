@@ -172,4 +172,4 @@ def render_template(template_name, template_dir='', default_context=None,
               encoding='utf-8') as f:
         return Template(f.read(), context=default_context,
                         template_dir=template_dir, **kwargs
-                        ).render(context=context)
+                        ).render(**context)
