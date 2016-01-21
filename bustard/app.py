@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import collections
+import inspect
 import os
 
 from .http import Request, Response, response_status_string
@@ -63,20 +64,12 @@ class Bustard(object):
             return self.abort(405)
 
         request = Request(environ)
-        if hasattr(func, 'before_request'):
-            b_hooks = [func.before_request]
-        else:
-            b_hooks = None
-        result = self.handle_before_request_hooks(request, extra_hooks=b_hooks)
+        result = self.handle_before_request_hooks(request, view_func=func)
         if isinstance(result, Response):
             response = result
         else:
             response = self.handle_view(request, func, func_kwargs)
-        if hasattr(func, 'after_request'):
-            a_hooks = [func.after_request]
-        else:
-            a_hooks = None
-        self.handle_after_request_hooks(request, response, extra_hooks=a_hooks)
+        self.handle_after_request_hooks(request, response, view_func=func)
 
         return self._make_response(body=response.body,
                                    code=response.status_code,
@@ -130,12 +123,13 @@ class Bustard(object):
         self._before_request_hooks.append(func)
         return func
 
-    def handle_before_request_hooks(self, request, extra_hooks=None):
+    def handle_before_request_hooks(self, request, view_func):
         hooks = self._before_request_hooks
-        if extra_hooks:
-            hooks.extends(extra_hooks)
-        for func in self._before_request_hooks:
-            result = func(request)
+        for hook in hooks:
+            if len(inspect.signature(hook).parameters) > 1:
+                result = hook(request, view_func)
+            else:
+                result = hook(request, view_func)
             if isinstance(result, Response):
                 return result
 
@@ -143,12 +137,13 @@ class Bustard(object):
         self._after_request_hooks.append(func)
         return func
 
-    def handle_after_request_hooks(self, request, response, extra_hooks=None):
+    def handle_after_request_hooks(self, request, response, view_func):
         hooks = self._after_request_hooks
-        if extra_hooks:
-            hooks.extends(extra_hooks)
-        for func in hooks:
-            func(request, response)
+        for hook in hooks:
+            if len(inspect.signature(hook).parameters) > 2:
+                hook(request, response, view_func)
+            else:
+                hook(request, response)
 
     def notfound(self):
         return self._make_response(NOTFOUND_HTML, code=404)
