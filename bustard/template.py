@@ -19,6 +19,7 @@ import os
 import re
 
 from .constants import TEMPLATE_BUILTIN_FUNC_WHITELIST
+from .utils import to_text
 
 
 class CodeBuilder(object):
@@ -80,14 +81,34 @@ class Template(object):
                  up_vars=None,
                  func_name='render_function',
                  result_var='result',
+                 auto_escape=True
                  ):
+        self.tokens_re = re.compile(r'''(?sx)(
+        (?:{token_expr_start}.*?{token_expr_end})
+        |(?:{token_tag_start}.*?{token_tag_end})
+        |(?:{token_comment_start}.*?{token_comment_end})
+        )'''.format(token_expr_start=re.escape(self.TOKEN_EXPR_START),
+                    token_expr_end=re.escape(self.TOKEN_EXPR_END),
+                    token_tag_start=re.escape(self.TOKEN_TAG_START),
+                    token_tag_end=re.escape(self.TOKEN_TAG_END),
+                    token_comment_start=re.escape(self.TOKEN_COMMENT_START),
+                    token_comment_end=re.escape(self.TOKEN_COMMENT_END),
+                    )
+        )
+
         self.context = {k: v
                         for k, v in builtins.__dict__.items()
                         if k in self.FUNC_WHITELIST
                         }
+        self.context.update({
+            'escape': escape,
+            'noescape': noescape,
+            'to_text': noescape,
+        })
         self.base_dir = template_dir
         self.func_name = func_name
         self.result_var = result_var
+        self.auto_escape = auto_escape
         # 上一层定义过的变量
         self.up_vars = up_vars or set()
         if context is not None:
@@ -102,6 +123,10 @@ class Template(object):
         self.section_vars = code.add_section()
         # 将函数内的执行结果保存在 result 中
         code.add_line('%s = []' % result_var)
+        # escape, noescape
+        code.add_line('escape = context["escape"]')
+        code.add_line('noescape = context["noescape"]')
+        code.add_line('to_text = context["to_text"]')
 
         self.tpl_text = text
         # 模板中出现过的全局变量
@@ -119,24 +144,15 @@ class Template(object):
             self.render_function = namespace[func_name]
 
     def parse_text(self, text):
-        tokens = re.split(r'''(?sx)
-        ({token_expr_start}.*?{token_expr_end}
-        |{token_tag_start}.*?{token_tag_end}
-        |{token_comment_start}.*?{token_comment_end})
-        '''.format(token_expr_start=re.escape(self.TOKEN_EXPR_START),
-                   token_expr_end=re.escape(self.TOKEN_EXPR_END),
-                   token_tag_start=re.escape(self.TOKEN_TAG_START),
-                   token_tag_end=re.escape(self.TOKEN_TAG_END),
-                   token_comment_start=re.escape(self.TOKEN_COMMENT_START),
-                   token_comment_end=re.escape(self.TOKEN_COMMENT_END),
-                   ),
-            text
-        )
+        tokens = self.tokens_re.split(text)
         # express_stack = []
 
         for token in tokens:
+            # 普通字符串
+            if not self.tokens_re.match(token):
+                self.buffered.append('%s' % repr(token))
             # {# ... #}
-            if token.startswith(self.TOKEN_COMMENT_START):
+            elif token.startswith(self.TOKEN_COMMENT_START):
                 continue
             # {{ abc }}
             elif token.startswith(self.TOKEN_EXPR_START):
@@ -144,7 +160,14 @@ class Template(object):
                                               self.TOKEN_EXPR_END).strip()
                 global_var = self.collect_var(global_var)
 
-                self.buffered.append('str(%s)' % self.wrap_var(global_var))
+                if self.auto_escape:
+                    self.buffered.append(
+                        'escape(%s)' % self.wrap_var(global_var)
+                    )
+                else:
+                    self.buffered.append(
+                        'to_text(%s)' % self.wrap_var(global_var)
+                    )
 
             # {% blala %}
             elif token.startswith(self.TOKEN_TAG_START):
@@ -172,7 +195,7 @@ class Template(object):
                     in_index = words.index('in')
                     tmp_var = self.collect_tmp_var(' '.join(words[1:in_index]))
                     global_var = self.collect_var(
-                        ' '.join(words[in_index + 1:])
+                        ' '.join(words[in_index + 1:]),
                     )
 
                     self.code.add_line('for %s in %s:'
@@ -180,6 +203,9 @@ class Template(object):
                     self.code.forward_indent()
 
                 elif words[0].startswith('end'):  # {% endif %}, {% endfor %}
+                    if words[0] == 'endfor':   # 排除循环过程中产生的临时变量
+                        self.global_vars = self.global_vars - self.tmp_vars
+                        self.tmp_vars.clear()
                     self.code.back_indent()
 
                 elif words[0] == 'include':
@@ -189,9 +215,6 @@ class Template(object):
                     self.code.source_code.append(_code)
                     self.code.add_line('%s.append(%s(context))'
                                        % (self.result_var, func_name))
-
-            else:   # 普通字符串
-                self.buffered.append('%s' % repr(token))
 
         self.define_global_vars()
 
@@ -205,7 +228,7 @@ class Template(object):
             if name not in self.up_vars:
                 self.section_vars.add_line('%s = context["%s"]' % (name, name))
 
-    def render(self, context=None):
+    def render(self, **context):
         """使用 context 字典渲染模板"""
         _context = {}
         _context.update(self.context)
@@ -224,7 +247,7 @@ class Template(object):
                 f.read(), self.context,
                 pre_compile=False, indent=self.code.indent_level,
                 template_dir=self.base_dir,
-                up_vars=up_vars,
+                up_vars=up_vars, auto_escape=self.auto_escape
             ).code
             return self.func_name, _code
 
@@ -245,15 +268,21 @@ class Template(object):
         if (not var) or var.startswith('"') or var.startswith('\''):
             return
 
-        _vars = re.split(r'[\s\(]+', var)
+        _vars = re.split(r'[,\s\(\)\[\]]+', var)
         if len(_vars) > 1:   # {% if len(foobar) %}
             for _var in _vars:
                 _var = _var.strip()
-                if re.match(r'^\w+\s*=', _var):   # {{ foobar(abc=1) }}
+                # {{ foobar(abc=1) }}, a[2]
+                if (re.match(r'^\w+\s*=[\'"\d]', _var) or
+                        re.match(r'^\d', _var)):
                     continue
+                # {{ foobar(abc=efg) }}
+                elif re.match(r'^\w+\s*=', _var):
+                    _var = _var.split('=')[1]
                 self._collect_var(_var, collect)
         elif re.match(r'^[a-zA-Z_](\w+)?', _vars[0]):
-            collect.add(_vars[0])
+            _var = _vars[0].split('.')[0]
+            collect.add(_var)
 
     def wrap_var(self, var):
         """处理变量, 将临时变量的名称增加 _ 前缀"""
@@ -270,3 +299,34 @@ class Template(object):
         text = text.replace(start, '', 1)
         text = text.replace(end, '', 1)
         return text
+
+
+class NoescapeText:
+
+    def __init__(self, raw_text):
+        self.raw_text = raw_text
+
+
+html_escape_table = {
+    '&': '&amp;',
+    '"': '&quot;',
+    '\'': '&apos;',
+    '>': '&gt;',
+    '<': '&lt;',
+}
+
+
+def html_escape(text):
+    return ''.join(html_escape_table.get(c, c) for c in text)
+
+
+def escape(text):
+    if isinstance(text, NoescapeText):
+        return to_text(text.raw_text)
+    else:
+        text = to_text(text)
+        return html_escape(text)
+
+
+def noescape(text):
+    return NoescapeText(text)
