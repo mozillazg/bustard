@@ -7,6 +7,8 @@ import sys
 import time
 import urllib
 
+from .utils import to_text, to_bytes
+
 
 class WSGIServer(object):
     address_family = socket.AF_INET
@@ -86,14 +88,14 @@ class WSGIServer(object):
 
     def parse_request(self, raw_request):
         # GET /foo?a=1&b=2 HTTP/1.1
-        first_line = raw_request.split('\r\n', 1)[0].strip()
+        first_line = to_text(raw_request.split(b'\r\n', 1)[0].strip())
         (self.request_method,   # GET
          self.path,             # /foo?a=1&b=2
          self.request_version   # HTTP/1.1
          ) = first_line.split()
 
     def parse_headers(self, raw_request):
-        header_string = raw_request.split('\r\n\r\n', 1)[0]
+        header_string = to_text(raw_request.split(b'\r\n\r\n', 1)[0])
         self.headers = headers = {}
         for header in header_string.splitlines()[1:-1]:
             k, v = header.split(':', 1)
@@ -111,7 +113,7 @@ class WSGIServer(object):
             path, query = self.path.split('?', 1)
         else:
             path, query = self.path, ''
-        env['PATH_INFO'] = urllib.unquote(path)
+        env['PATH_INFO'] = urllib.parse.unquote(path)
         env['QUERY_STRING'] = query
 
         env['CONTENT_TYPE'] = self.headers.get('Content-Type', '')
@@ -157,10 +159,15 @@ class WSGIServer(object):
         try:
             status, headers = self.headers_set
             # status line
-            response = self.default_request_version + ' ' + status + '\r\n'
+            response = (
+                to_bytes(self.default_request_version) +
+                b' ' +
+                to_bytes(status) +
+                b'\r\n'
+            )
             # headers
-            response += '\r\n'.join([': '.join(x) for x in headers])
-            response += '\r\n\r\n'
+            response += b'\r\n'.join([to_bytes(': '.join(x)) for x in headers])
+            response += b'\r\n\r\n'
             # body
             for d in body:
                 response += d
