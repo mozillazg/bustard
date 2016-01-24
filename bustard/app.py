@@ -21,7 +21,7 @@ class Bustard(object):
     def __init__(self, name='', template_dir='',
                  template_default_context=None):
         self.name = name
-        self._route = Router()
+        self._router = Router()
         self.template_dir = template_dir
         if template_default_context is not None:
             self.template_default_context = template_default_context
@@ -39,7 +39,7 @@ class Bustard(object):
         ).encode('utf-8')
 
     def url_for(self, func_name, _request=None, _external=False, **kwargs):
-        url = self._route.url_for(func_name, **kwargs)
+        url = self._router.url_for(func_name, **kwargs)
         if _external:
             request = _request
             url = '{}://{}{}'.format(request.scheme, request.host, url)
@@ -50,7 +50,7 @@ class Bustard(object):
 
         :return: (func, methods, func_kwargs)
         """
-        return self._route.get_func(path)
+        return self._router.get_func(path)
 
     def __call__(self, environ, start_response):
         """for wsgi server"""
@@ -114,7 +114,7 @@ class Bustard(object):
     def route(self, path, methods=None):
 
         def wrapper(func):
-            self._route.register(path, func, methods)
+            self._router.register(path, func, methods)
             return func
 
         return wrapper

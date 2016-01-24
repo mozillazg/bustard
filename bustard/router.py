@@ -29,7 +29,7 @@ class Router(object):
             m = url_match.match(path)
             if m is not None:
                 return func_pair.func, func_pair.methods, m.groupdict()
-        return None, None, {}
+        return None, None, None
 
     def url_for(self, func_name, **kwargs):
         for url_builder, func_pair in self._urls_builer_map.items():
@@ -42,8 +42,8 @@ class Router(object):
 class URLBuilder(object):
     # /<int:id>
     RE_PATH_TYPE = re.compile(r'''<
-    (?P<type>(?:int|float|path):)?
-    (?P<name>[^>]+)
+    (?:(?P<type>int|float|path):)?
+    (?P<name>\w+)
     >''', re.X)
     TYPE_REGEX_MAP = {
         'int': r'\d+',
@@ -86,7 +86,7 @@ class URLBuilder(object):
             exp = exp + '$'
 
         # /<int:id>
-        if cls.RE_PATH_TYPE.search(exp):
+        if '(?P<' not in exp and cls.RE_PATH_TYPE.search(exp):
             exp = cls.RE_PATH_TYPE.sub(cls._replace_type_to_regex, exp)
         return exp
 
@@ -94,7 +94,7 @@ class URLBuilder(object):
     def _replace_type_to_regex(cls, match):
         """ /<int:id>  -> r'(?P<id>\d+)' """
         groupdict = match.groupdict()
-        _type = groupdict.get('_type')
+        _type = groupdict.get('type')
         type_regex = cls.TYPE_REGEX_MAP.get(_type, '[^/]+')
         name = groupdict.get('name')
         return r'(?P<{name}>{type_regex})'.format(
