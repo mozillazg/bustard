@@ -113,8 +113,8 @@ class URLBuilder(object):
     def __repr__(self):
         return r'<URLBuilder; url_format: {!r}>'.format(self.url_format)
 
-    def __eq__(self, obj):
-        return hash(self.url_regex) == hash(obj.url_regex)
+    def __eq__(self, other):
+        return hash(self.url_regex) == hash(other.url_regex)
 
     def __hash__(self):
         return hash(self.url_regex)

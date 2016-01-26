@@ -8,6 +8,7 @@ A tiny web framework powered by Python.
 * template
 * router
 * view
+* model
 * wsgi server
 
 

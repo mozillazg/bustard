@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import binascii
 import base64
 import collections
 import urllib
@@ -16,11 +17,10 @@ class MultiDict(collections.UserDict):
         return self.data[key][-1]
 
     def __setitem__(self, key, value):
-        if not isinstance(value, (list, tuple)):
-            value = to_text(value)
-            self.data[key] = [value]
+        if isinstance(value, (list, tuple)):
+            self.data[key] = list(value)
         else:
-            self.data[key] = list(map(to_text, value))
+            self.data[key] = [value]
 
     def __repr__(self):
         return '{}({})'.format(self.__class__.__name__, self.data)
@@ -47,22 +47,22 @@ def to_header_key(key):
     return '-'.join(x.capitalize() for x in key.split('-'))
 
 
-def to_text(s, encoding='utf-8'):
-    if isinstance(s, str):
-        return s
-    elif isinstance(s, collections.ByteString):
-        return s.decode(encoding)
+def to_text(st, encoding='utf-8'):
+    if isinstance(st, str):
+        return st
+    elif isinstance(st, collections.ByteString):
+        return st.decode(encoding)
     else:
-        return str(s)
+        return str(st)
 
 
-def to_bytes(b, encoding='utf-8'):
-    if isinstance(b, collections.ByteString):
-        return b
-    elif isinstance(b, str):
-        return b.encode(encoding)
+def to_bytes(bt, encoding='utf-8'):
+    if isinstance(bt, collections.ByteString):
+        return bt
+    elif isinstance(bt, str):
+        return bt.encode(encoding)
     else:
-        return bytes(b)
+        return bytes(bt)
 
 
 class Authorization:
@@ -72,11 +72,35 @@ class Authorization:
         self.username = data_dict.get('username')
         self.password = data_dict.get('password')
 
+    def __eq__(self, other):
+        return (
+            self.type == other.type and
+            self.username == other.username and
+            self.password == other.password
+        )
+
+    __hash__ = object.__hash__
+
+    def __repr__(self):
+        return '{}(type:{}, username:{})'.format(
+            self.__class__.__name__, self.type, self.username
+        )
+
 
 def parse_basic_auth_header(value):
-    auth_type, auth_info = to_bytes(value).split(None, 1)
+    try:
+        auth_type, auth_info = to_bytes(value).split(None, 1)
+    except ValueError:
+        return
     auth_type = auth_type.lower()
+
     if auth_type == b'basic':
-        username, password = base64.b64decode(auth_info).split(b':', 1)
-        return Authorization(auth_type, {'username': to_text(username),
-                                         'password': to_text(password)})
+        try:
+            username, password = base64.b64decode(auth_info).split(b':', 1)
+        except (binascii.Error, ValueError):
+            return
+
+        return Authorization(
+            to_text(auth_type),
+            {'username': to_text(username), 'password': to_text(password)}
+        )

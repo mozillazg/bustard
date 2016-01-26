@@ -350,4 +350,8 @@ class Headers(MultiDict):
 
     def __setitem__(self, key, value):
         key = to_text(to_header_key(key))
+        if isinstance(value, (list, tuple)):
+            value = list(map(to_text, value))
+        else:
+            value = to_text(value)
         super(Headers, self).__setitem__(key, value)

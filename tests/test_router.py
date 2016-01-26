@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict
-
 import pytest
 
 from bustard.router import Router
@@ -67,7 +65,6 @@ def test_get_func(path, func_name, methods, kwargs):
 @pytest.mark.parametrize('func_name, kwargs, path', [
     # /path
     ('func_a', {}, '/a'),
-    ('func_a', OrderedDict([('a', 'b'), ('c', 1)]), '/a?a=b&c=1'),
     ('func_b', {}, '/b/c/'),
     ('func_c', {}, '/c/d/f'),
     # regex
@@ -84,3 +81,11 @@ def test_get_func(path, func_name, methods, kwargs):
 ])
 def test_url_for(func_name, kwargs, path):
     assert router.url_for(func_name, **kwargs) == path
+
+
+def test_url_for2():
+    result = router.url_for('func_a', a='b', c=1)
+    try:
+        assert result == '/a?a=b&c=1'
+    except:
+        assert result == '/a?c=1&a=b'
