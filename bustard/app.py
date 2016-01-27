@@ -78,8 +78,8 @@ class Bustard(object):
     def handle_view(self, request, view_func, func_kwargs):
         result = view_func(request, **func_kwargs)
         if isinstance(result, (list, tuple)):
-            response = Response(content=result[1],
-                                status_code=result[0],
+            response = Response(content=result[0],
+                                status_code=result[1],
                                 headers=result[2])
         elif isinstance(result, Response):
             response = result
@@ -151,10 +151,10 @@ class Bustard(object):
     def abort(self, code):
         return self._make_response(b'', code=code)
 
-    def make_response(self, content=b'', *args, **kwargs):
+    def make_response(self, content=b'', **kwargs):
         if isinstance(content, Response):
             return content
-        return Response(content, *args, **kwargs)
+        return Response(content, **kwargs)
 
     def test_client(self):
         return Client(self)
