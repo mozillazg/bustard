@@ -80,10 +80,10 @@ def test_to_bytes(bt, expect):
     ('Basic user:passwd', None),
     ('basic user:{}'.format(base64.b64encode(b'passwd').decode()), None),
     ('basic {}'.format(base64.b64encode(b'user:passwd').decode()),
-     Authorization('basic', {'username': 'user', 'password': 'passwd'})
+     Authorization('basic', 'user', 'passwd')
      ),
     ('Basic {}'.format(base64.b64encode(b'user:passwd').decode()),
-     Authorization('basic', {'username': 'user', 'password': 'passwd'})
+     Authorization('basic', 'user', 'passwd')
      ),
 ])
 def test_parse_basic_auth_header(value, expect):

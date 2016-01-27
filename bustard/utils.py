@@ -67,10 +67,10 @@ def to_bytes(bt, encoding='utf-8'):
 
 class Authorization:
 
-    def __init__(self, _type, data_dict):
+    def __init__(self, _type, username, password):
         self.type = _type
-        self.username = data_dict.get('username')
-        self.password = data_dict.get('password')
+        self.username = username
+        self.password = password
 
     def __eq__(self, other):
         return (
@@ -102,5 +102,6 @@ def parse_basic_auth_header(value):
 
         return Authorization(
             to_text(auth_type),
-            {'username': to_text(username), 'password': to_text(password)}
+            username=to_text(username),
+            password=to_text(password)
         )
