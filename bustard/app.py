@@ -3,14 +3,15 @@ import collections
 import inspect
 import os
 
-from .http import Request, Response, response_status_string
+from .exceptions import HTTPException
+from .http import Request, Response
 from .router import Router
 from .template import Template
 from .testing import Client
 from .utils import to_bytes
 from .wsgi_server import make_server
 
-NOTFOUND_HTML = """
+NOTFOUND_HTML = b"""
 <html>
     <h1>404 Not Found</h1>
 </html>
@@ -68,12 +69,13 @@ class Bustard(object):
         if isinstance(result, Response):
             response = result
         else:
-            response = self.handle_view(request, func, func_kwargs)
+            try:
+                response = self.handle_view(request, func, func_kwargs)
+            except HTTPException as ex:
+                response = ex.response
         self.handle_after_request_hooks(request, response, view_func=func)
 
-        return self._make_response(body=response.body,
-                                   code=response.status_code,
-                                   headers=response.headers_list)
+        return self._start_response(response)
 
     def handle_view(self, request, view_func, func_kwargs):
         result = view_func(request, **func_kwargs)
@@ -87,29 +89,16 @@ class Bustard(object):
             response = Response(result)
         return response
 
-    def _make_response(self, body, code=200, headers=None,
-                       content_type='text/html; charset=utf-8'):
-        if isinstance(body, str):
-            body = body.encode('utf-8')
-
-        if isinstance(code, int):
-            status_code = response_status_string(code)
-        else:
-            status_code = str(code)
-
-        if isinstance(headers, dict):
-            headers.setdefault('Content-Type', content_type)
-            headers_list = headers.items()
-        elif isinstance(headers, collections.Iterable):
-            headers_list = headers
-        else:
-            headers_list = (('Content-Type', content_type),)
+    def _start_response(self, response):
+        body = response.body
+        status_code = to_bytes(response.status)
+        headers_list = response.headers_list
         self.start_response(status_code, headers_list)
 
         if isinstance(body, collections.Iterator):
             return (to_bytes(x) for x in body)
         else:
-            return [body]
+            return [to_bytes(body)]
 
     def route(self, path, methods=None):
 
@@ -146,10 +135,10 @@ class Bustard(object):
                 hook(request, response)
 
     def notfound(self):
-        return self._make_response(NOTFOUND_HTML, code=404)
+        raise HTTPException(Response(NOTFOUND_HTML, status_code=404))
 
     def abort(self, code):
-        return self._make_response(b'', code=code)
+        raise HTTPException(Response(status_code=code))
 
     def make_response(self, content=b'', **kwargs):
         if isinstance(content, Response):
