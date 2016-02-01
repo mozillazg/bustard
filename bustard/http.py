@@ -180,10 +180,7 @@ class Response(object):
                  headers=None):
         self._content = content
         self._status_code = status_code
-        if headers is None:
-            _headers = {}
-        else:
-            _headers = headers
+        _headers = headers or {}
         _headers.setdefault('Content-Type', content_type)
         if isinstance(_headers, Headers):
             self._headers = _headers
@@ -275,6 +272,12 @@ class Response(object):
         )
         return headers_list
 
+    def json(self):
+        return json.loads(to_text(self.data))
+
+    def __repr__(self):
+        return '<{} [{}]>'.format(self.__class__.__name__, self.status_code)
+
 
 def cookie_dump(key, value='', max_age=None, expires=None, path='/',
                 domain=None, secure=False, httponly=False):
@@ -317,11 +320,10 @@ class Headers(MultiDict):
 
     def add(self, key, value):
         key = to_text(to_header_key(key))
-        value = to_text(value)
         if isinstance(value, (tuple, list)):
-            self.data.setdefault(key, []).extend(value)
+            self.data.setdefault(key, []).extend(map(to_text, value))
         else:
-            self.data.setdefault(key, []).append(value)
+            self.data.setdefault(key, []).append(to_text(value))
 
     def set(self, key, value):
         self.__setitem__(key, value)

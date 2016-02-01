@@ -3,7 +3,7 @@ import collections
 import inspect
 import os
 
-from .exceptions import HTTPException
+from .exceptions import HTTPException, NotFound
 from .http import Request, Response
 from .router import Router
 from .template import Template
