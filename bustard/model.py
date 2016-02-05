@@ -2,18 +2,19 @@
 import abc
 import collections
 
-__tables = {}
-__indexes = []
+_tables = collections.OrderedDict()
+_indexes = []
 
 
 class Field(metaclass=abc.ABCMeta):
     def __init__(self, name=None, max_length=None, default=None,
-                 unique=False, nullable=True, index=False,
-                 primary_key=False, foreign_key=None,
-                 server_default=None):
+                 server_default=None, unique=False, nullable=True,
+                 index=False, primary_key=False, foreign_key=None):
         self.name = name
         self.max_length = max_length
         self.default = default
+        if server_default is True or server_default is False:
+            server_default = str(server_default).upper()
         self.server_default = server_default
         self.unique = unique
         self.nullable = nullable
@@ -32,7 +33,7 @@ class Field(metaclass=abc.ABCMeta):
         if self.max_length is not None:
             sql += '({0.max_length})'.format(self)
         if self.server_default:
-            sql += ' default {0.server_default}'.format(self)
+            sql += ' DEFAULT {0.server_default}'.format(self)
         if not self.nullable:
             sql += ' NOT NULL'
         if self.unique:
@@ -40,7 +41,7 @@ class Field(metaclass=abc.ABCMeta):
         if self.primary_key:
             sql += ' PRIMARY KEY'
         if self.foreign_key is not None:
-            sql += ' {}'.format(self.foreign_key.to_sql)
+            sql += ' {}'.format(self.foreign_key.to_sql())
         return sql
 
 
@@ -69,12 +70,12 @@ def _collect_indexes(table_name, attr_dict):
         if isinstance(attr_value, Field):
             if not any([attr_value.unique, attr_value.primary_key,
                         attr_value.foreign_key]) and attr_value.index:
-                indexes.apend(attr_value)
+                indexes.append(attr_value)
     for field in indexes:
         column_name = field.name
         name = 'index_{}_{}'.format(table_name, column_name)
         index = Index(name, table_name, column_name, unique=field.unique)
-        __indexes.append(index)
+        _indexes.append(index)
 
 
 class ModelMetaClass(type):
@@ -84,8 +85,9 @@ class ModelMetaClass(type):
         if table_name:
             cls._table_name = table_name
             cls._fields = _collect_fields(attr_dict)
-            __tables[cls._table_name] = cls
+            _tables[cls._table_name] = cls
             _auto_column_name(attr_dict)
+            _collect_indexes(table_name, attr_dict)
 
     @classmethod
     def __prepare__(cls, name, bases):
@@ -94,7 +96,16 @@ class ModelMetaClass(type):
 
 
 class Model(metaclass=ModelMetaClass):
-    pass
+
+    @classmethod
+    def table_sql(cls):
+        column_sqls = ',\n    '.join(field.to_sql() for field in cls._fields)
+        sql = '''
+CREATE TABLE {table_name} (
+    {column_sqls}
+);
+'''.format(table_name=cls._table_name, column_sqls=column_sqls)
+        return sql
 
 
 class CharField(Field):
@@ -173,6 +184,13 @@ class Index:
         sql = 'CREATE'
         if self.unique:
             sql += ' UNIQUE'
-        sql += (' INDEX {0.name} on {0.table_name} ({0.column_name})'
+        sql += (' INDEX {0.name} ON {0.table_name} ({0.column_name})'
                 ).format(self)
-        return sql
+        return sql + ';'
+
+
+def index_sqls():
+    sqls = []
+    for index in _indexes:
+        sqls.append(index.to_sql())
+    return ';\n'.join(sqls)
