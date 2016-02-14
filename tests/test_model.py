@@ -7,8 +7,8 @@ from bustard.model import ForeignKey
 def model():
     from bustard import model
     yield model
-    model._tables = {}
-    model._indexes = []
+    model.MetaData.tables = {}
+    model.MetaData.indexes = []
 
 
 @pytest.mark.parametrize('fieldclass, data_type', [
@@ -47,11 +47,11 @@ def test_define_model(model):
         __tablename__ = 'users'
         id = model.AutoField(primary_key=True)
         username = model.CharField(max_length=80, default='',
-                                   server_default='""', index=True)
+                                   server_default="''", index=True)
         password = model.CharField(max_length=200, default='',
-                                   server_default='""')
+                                   server_default="''")
         is_actived = model.BooleanField(default=False, server_default=False)
-        description = model.TextField(default='', server_default='""')
+        description = model.TextField(default='', server_default="''")
 
     assert User.table_sql() == '''
 CREATE TABLE users (
@@ -64,6 +64,6 @@ CREATE TABLE users (
 '''
 
     assert (
-        model.index_sqls() ==
+        model.MetaData.index_sqls() ==
         'CREATE INDEX index_users_username ON users (username);'
     )
