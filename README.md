@@ -1,5 +1,7 @@
 # bustard
 
+[![Build Status](https://travis-ci.org/mozillazg/bustard.svg?branch=master)](https://travis-ci.org/mozillazg/bustard)
+
 A tiny web framework powered by Python.
 
 
@@ -7,8 +9,7 @@ A tiny web framework powered by Python.
 
 * template
 * router
-* view
-* model
+* orm
 * wsgi server
 
 

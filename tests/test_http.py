@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 import pytest
 
-from bustard.http import (
-    jsonify, Headers, Request, Response, redirect,
-    response_status_string
-)
+from bustard.http import jsonify, Headers, redirect, response_status_string
 
 
 class TestHeaders:

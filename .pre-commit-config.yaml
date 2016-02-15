@@ -1,4 +1,4 @@
-- repo: git@github.com:pre-commit/pre-commit-hooks
+- repo: git://github.com/pre-commit/pre-commit-hooks
   sha: daa1e9a837eceab5c0869ea7fa22a016311391ef
   hooks:
     - id: check-merge-conflict
