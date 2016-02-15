@@ -140,6 +140,9 @@ class Field(metaclass=abc.ABCMeta):
                 value = 'None'
         return value
 
+    def name_sql(self):
+        return '{}.{}'.format(self.model.table_name, self.name)
+
 
 def _collect_fields(attr_dict, model):
     fields = []
@@ -459,9 +462,21 @@ class QuerySet:
         return self.clone()
 
     def count(self):
-        sql, args = self._build_sql(count=True)
+        sql, args = self._build_select_sql(count=True)
         self.session.execute(sql, args)
         return self.session.fetchone()[0]
+
+    def update(self, **kwargs):
+        sql_values = collections.OrderedDict()
+        for kw, value in kwargs.items():
+            for field in self.model.fields:
+                if field._name == kw:
+                    sql_values[field.name] = value
+                    break
+            else:
+                raise KeyError('{} is invalid field name'.format(kw))
+        sql, args = self._build_update_sql(sql_values)
+        self.session.execute(sql, args)
 
     def _build_where_sql(self):
         where = ' AND '.join(x[0] for x in self.wheres)
@@ -486,7 +501,7 @@ class QuerySet:
             return 'ORDER BY {0}'.format(order_by)
         return ''
 
-    def _build_sql(self, count=False):
+    def _build_select_sql(self, count=False):
         table_name = self.model.table_name
         where, args = self._build_where_sql()
         if count:
@@ -511,10 +526,22 @@ class QuerySet:
         )
         return sql, args
 
+    def _build_update_sql(self, sql_values):
+        table_name = self.model.table_name
+        where, args = self._build_where_sql()
+        columns = ', '.join('{0} = %s'.format(k) for k in sql_values)
+        sql = (
+            'UPDATE {table_name} SET {columns} {where};'.format(
+                table_name=table_name, columns=columns, where=where,
+            )
+        )
+        args = list(sql_values.values()) + args
+        return sql, args
+
     def _execute(self):
         if hasattr(self, '_data'):
             return
-        sql, args = self._build_sql()
+        sql, args = self._build_select_sql()
         self.session.execute(sql, args)
         self._data = []
         for row in self.session.fetchall():
