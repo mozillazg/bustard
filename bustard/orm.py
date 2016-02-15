@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import abc
 import collections
+import logging
 
 import psycopg2
+
+logger = logging.getLogger(__name__)
 
 
 class MetaData:
@@ -318,6 +321,7 @@ class Session:
         self.cursor = self.connection.cursor()
 
     def execute(self, sql, args):
+        logger.debug('execute sql: %s, args: %s', sql, args)
         return self.cursor.execute(sql, args)
 
     def fetchone(self):
@@ -386,15 +390,27 @@ class Session:
 
 class QuerySet:
 
-    def __init__(self, session, model, queryset=None):
+    def __init__(self, session, model):
         self.session = session
         self.model = model
         self.wheres = []
-        if queryset is not None:
-            self.clone_queryset(queryset)
+        self._limit = None
+        self._offset = None
 
-    def clone_queryset(self, queryset):
-        self.wheres.extend(queryset.wheres)
+    def clone(self):
+        queryset = type(self)(self.session, self.model)
+        queryset.wheres.extend(self.wheres)
+        queryset._limit = self._limit
+        queryset._offset = self._offset
+        return queryset
+
+    def limit(self, number):
+        self._limit = number
+        return self.clone()
+
+    def offset(self, number):
+        self._offset = number
+        return self.clone()
 
     def filter(self, *args, **kwargs):
         wheres = []
@@ -403,14 +419,27 @@ class QuerySet:
         for kw, value in kwargs.items():
             wheres.append(('{} = %s'.format(kw), value))
         self.wheres.extend(wheres)
-        return type(self)(self.session, self.model, queryset=self)
+        return self.clone()
 
     def _build_where_sql(self):
-        where = 'AND '.join(x[0] for x in self.wheres)
+        where = ' AND '.join(x[0] for x in self.wheres)
         args = [x[1] for x in self.wheres if x[1] is not None]
         if where:
             where = 'WHERE ' + where
         return where, args
+
+    def _build_limit_sql(self):
+        if self._limit is not None:
+            return 'LIMIT {}'.format(self._limit)
+        return ''
+
+    def _build_offset_sql(self):
+        if self._offset is not None:
+            return 'OFFSET {}'.format(self._offset)
+        return ''
+
+    def _build_order_by_sql(self):
+        return ''
 
     def _build_sql(self):
         table_name = self.model.table_name
@@ -421,9 +450,18 @@ class QuerySet:
             )
             for field in self.model.fields
         )
-        return ('SELECT {column_names} FROM {table_name} {where};'.format(
-                column_names=column_names, table_name=table_name, where=where
-                ), args)
+        offset = self._build_offset_sql()
+        limit = self._build_limit_sql()
+        order_by = self._build_order_by_sql()
+
+        sql = (
+            'SELECT {column_names} FROM {table_name} {where}'
+            ' {offset} {limit} {order_by};'.format(
+                column_names=column_names, table_name=table_name, where=where,
+                offset=offset, limit=limit, order_by=order_by
+            )
+        )
+        return sql, args
 
     def _execute(self):
         if hasattr(self, '_data'):
