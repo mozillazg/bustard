@@ -57,11 +57,17 @@ class Field(metaclass=abc.ABCMeta):
         self.primary_key = primary_key
         self.foreign_key = foreign_key
 
-    def __get__(self, instance, attr):
-        return instance.__dict__[attr]
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        if self._name not in instance.__dict__:
+            value = getattr(owner, self._name)
+            return value.default_value()
+        else:
+            return instance.__dict__[self._name]
 
-    def __set__(self, instance, attr, value):
-        instance.__dict__[attr] = value
+    def __set__(self, instance, value):
+        instance.__dict__[self._name] = value
 
     def __lt__(self, value):
         return '{.sql_column} < %s'.format(self), value
@@ -105,8 +111,6 @@ class Field(metaclass=abc.ABCMeta):
         if self.default is None:
             if isinstance(self, TextField):
                 value = 'None'
-            else:
-                value = 'null'
         return value
 
 
@@ -158,7 +162,7 @@ class ModelMetaClass(type):
             cls.fields = _collect_fields(attr_dict, cls)
             for field in cls.fields:
                 if field.primary_key:
-                    cls.pk_field = field
+                    cls.pk_name = field.name
                     break
             _collect_indexes(table_name, attr_dict)
 
@@ -169,6 +173,18 @@ class ModelMetaClass(type):
 
 
 class Model(metaclass=ModelMetaClass):
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(self.default_dict())
+        for kwg, value in kwargs.items():
+            setattr(self, kwg, value)
+        for field in self.fields:
+            if field.primary_key:
+                self.pk_field = field
+                break
+
+    def default_dict(self):
+        return {field._name: field.default_value() for field in self.fields}
 
     @classmethod
     def table_sql(cls):
@@ -186,9 +202,8 @@ CREATE TABLE {table_name} (
             if field is self.pk_field:
                 continue
             value = getattr(self, field._name, field.default_value())
-            if value is None:
-                value = 'null'
-            values_dict[field.name] = value
+            if value is not None:
+                values_dict[field.name] = value
         return values_dict
 
 
@@ -287,9 +302,18 @@ class Engine:
 
 
 class Session:
+    _bind = None
 
-    def __init__(self, bind):
-        self.bind = bind
+    def __init__(self, bind=None):
+        self.bind = bind or self._bind
+        if self.bind is not None:
+            self.connect()
+
+    @classmethod
+    def configure(cls, bind):
+        cls._bind = bind
+
+    def connect(self):
         self.connection = self.bind.connect()
         self.cursor = self.connection.cursor()
 
@@ -311,21 +335,27 @@ class Session:
     def commit(self):
         self.connection.commit()
 
+    def rollback(self):
+        self.connection.rollback()
+
     def close(self):
         self.cursor.close()
         self.connection.close()
 
     def insert(self, instance):
+        pk_name = instance.pk_field.name
         sql_values = instance.sql_values()
         columns = ', '.join('{0}'.format(k) for k in sql_values)
         values = ', '.join('%s' for k in sql_values)
-        sql = 'INSERT INTO {table_name} ({columns}) VALUES ({values});'.format(
+        sql = (
+            'INSERT INTO {table_name} ({columns}) VALUES ({values}) '
+            'RETURNING {pk_name};').format(
             table_name=instance.table_name, columns=columns,
-            values=values
+            values=values, pk_name=pk_name
         )
-        args = sql_values.values()
+        args = list(sql_values.values())
         self.execute(sql, args)
-        pk_value = self.cursor.lastrowid
+        pk_value = self.fetchone()[0]
         setattr(instance, instance.pk_field._name, pk_value)
 
     def update(self, instance):
@@ -334,20 +364,21 @@ class Session:
         sql_values = instance.sql_values()
         columns = ', '.join('{0} = %s'.format(k) for k in sql_values)
         sql = 'UPDATE {table_name} SET {columns} WHERE {pk_name} = %s;'.format(
-            table_name=instance.table_name, pk_column=pk_name,
+            table_name=instance.table_name, pk_name=pk_name,
             columns=columns
         )
-        args = sql_values.values() + [pk_value]
+        args = list(sql_values.values()) + [pk_value]
         self.execute(sql, args)
 
     def delete(self, instance):
         pk_name = instance.pk_field.name
         pk_value = getattr(instance, pk_name)
         sql = 'DELETE FROM {table_name} WHERE {pk_name} = %s'.format(
-            table_name=instance.table_name, pk_column=pk_name
+            table_name=instance.table_name, pk_name=pk_name
         )
         args = (pk_value,)
         self.execute(sql, args)
+        setattr(instance, pk_name, None)
 
 
 class QuerySet:
