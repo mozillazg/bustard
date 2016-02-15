@@ -73,7 +73,7 @@ class Field(metaclass=abc.ABCMeta):
         return '{.sql_column} < %s'.format(self), value
 
     def __eq__(self, value):
-        return '{sql_column} = %s'.format(self), value
+        return '{.sql_column} = %s'.format(self), value
 
     def __ne__(self, value):
         return '{.sql_column} != %s'.format(self), value
@@ -380,38 +380,71 @@ class Session:
         self.execute(sql, args)
         setattr(instance, pk_name, None)
 
+    def query(self, model):
+        return QuerySet(self, model)
+
 
 class QuerySet:
 
-    def __init__(self, session, model, exps=None):
+    def __init__(self, session, model, queryset=None):
         self.session = session
         self.model = model
-        self.exps = exps or []
+        self.wheres = []
+        if queryset is not None:
+            self.clone_queryset(queryset)
+
+    def clone_queryset(self, queryset):
+        self.wheres.extend(queryset.wheres)
 
     def filter(self, *args, **kwargs):
-        pass
+        wheres = []
+        for arg in args:
+            wheres.append(arg)
+        for kw, value in kwargs.items():
+            wheres.append(('{} = %s'.format(kw), value))
+        self.wheres.extend(wheres)
+        return type(self)(self.session, self.model, queryset=self)
+
+    def _build_where_sql(self):
+        where = 'AND '.join(x[0] for x in self.wheres)
+        args = [x[1] for x in self.wheres if x[1] is not None]
+        if where:
+            where = 'WHERE ' + where
+        return where, args
 
     def _build_sql(self):
         table_name = self.model.table_name
-        where = 'AND '.join(x[0] for x in self.exps)
-        args = [x[1] for x in self.exps]
-        if where:
-            where = 'WHERE ' + where
+        where, args = self._build_where_sql()
         column_names = ', '.join(
             '{column_name} AS {table_name}_{column_name}'.format(
                 column_name=field.name, table_name=table_name
             )
-            for field in self.models.fields
+            for field in self.model.fields
         )
         return ('SELECT {column_names} FROM {table_name} {where};'.format(
                 column_names=column_names, table_name=table_name, where=where
                 ), args)
 
-    def __iter__(self):
+    def _execute(self):
+        if hasattr(self, '_data'):
+            return
         sql, args = self._build_sql()
         self.session.execute(sql, args)
+        self._data = []
         for row in self.session.fetchall():
             instance = self.model()
             for nu, value in enumerate(row):
                 setattr(instance, self.model.fields[nu].name, value)
-            yield instance
+            self._data.append(instance)
+
+    def __len__(self):
+        self._execute()
+        pass
+
+    def __getitem__(self, index):
+        self._execute()
+        return self._data[index]
+
+    def __iter__(self):
+        self._execute()
+        return iter(self._data)
