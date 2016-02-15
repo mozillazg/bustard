@@ -75,6 +75,9 @@ class Field(metaclass=abc.ABCMeta):
     def __lt__(self, value):
         return '{.sql_column} < %s'.format(self), value
 
+    def __le__(self, value):
+        return '{.sql_column} <= %s'.format(self), value
+
     def __eq__(self, value):
         return '{.sql_column} = %s'.format(self), value
 
@@ -84,12 +87,33 @@ class Field(metaclass=abc.ABCMeta):
     def __gt__(self, value):
         return '{.sql_column} > %s'.format(self), value
 
+    def __ge__(self, value):
+        return '{.sql_column} >= %s'.format(self), value
+
     def like(self, value):
         return '{.sql_column} LIKE %s'.format(self), value
 
     @property
     def desc(self):
         return '{.sql_column} DESC'.format(self)
+
+    def is_(self, value):
+        return '{.sql_column} IS %s'.format(self), value
+
+    def is_not(self, value):
+        return '{.sql_column} IS NOT %s'.format(self), value
+
+    def not_in(self, value):
+        '''
+        :type value: tuple
+        '''
+        return '{.sql_column} NOT IN %s'.format(self), value
+
+    def in_(self, value):
+        '''
+        :type value: tuple
+        '''
+        return '{.sql_column} IN %s'.format(self), value
 
     def to_sql(self):
         sql = '{0.name} {0.data_type}'.format(self)
@@ -396,12 +420,14 @@ class QuerySet:
         self.wheres = []
         self._limit = None
         self._offset = None
+        self._order_by = []
 
     def clone(self):
         queryset = type(self)(self.session, self.model)
         queryset.wheres.extend(self.wheres)
         queryset._limit = self._limit
         queryset._offset = self._offset
+        queryset._order_by = self._order_by
         return queryset
 
     def limit(self, number):
@@ -410,6 +436,17 @@ class QuerySet:
 
     def offset(self, number):
         self._offset = number
+        return self.clone()
+
+    def order_by(self, *args):
+        orders = []
+        for arg in args:
+            if isinstance(arg, Field):
+                exp = '{0}.{1}'.format(self.model.table_name, arg.name)
+            else:
+                exp = str(arg)
+            orders.append(exp)
+        self._order_by.extend(orders)
         return self.clone()
 
     def filter(self, *args, **kwargs):
@@ -423,7 +460,7 @@ class QuerySet:
 
     def _build_where_sql(self):
         where = ' AND '.join(x[0] for x in self.wheres)
-        args = [x[1] for x in self.wheres if x[1] is not None]
+        args = [x[1] for x in self.wheres if len(x) > 1]
         if where:
             where = 'WHERE ' + where
         return where, args
@@ -439,6 +476,9 @@ class QuerySet:
         return ''
 
     def _build_order_by_sql(self):
+        if self._order_by:
+            order_by = ', '.join(self._order_by)
+            return 'ORDER BY {0}'.format(order_by)
         return ''
 
     def _build_sql(self):
