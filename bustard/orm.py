@@ -458,6 +458,11 @@ class QuerySet:
         self.wheres.extend(wheres)
         return self.clone()
 
+    def count(self):
+        sql, args = self._build_sql(count=True)
+        self.session.execute(sql, args)
+        return self.session.fetchone()[0]
+
     def _build_where_sql(self):
         where = ' AND '.join(x[0] for x in self.wheres)
         args = [x[1] for x in self.wheres if len(x) > 1]
@@ -481,15 +486,18 @@ class QuerySet:
             return 'ORDER BY {0}'.format(order_by)
         return ''
 
-    def _build_sql(self):
+    def _build_sql(self, count=False):
         table_name = self.model.table_name
         where, args = self._build_where_sql()
-        column_names = ', '.join(
-            '{column_name} AS {table_name}_{column_name}'.format(
-                column_name=field.name, table_name=table_name
+        if count:
+            column_names = 'COUNT(*)'
+        else:
+            column_names = ', '.join(
+                '{column_name} AS {table_name}_{column_name}'.format(
+                    column_name=field.name, table_name=table_name
+                )
+                for field in self.model.fields
             )
-            for field in self.model.fields
-        )
         offset = self._build_offset_sql()
         limit = self._build_limit_sql()
         order_by = self._build_order_by_sql()
