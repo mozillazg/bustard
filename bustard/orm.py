@@ -478,6 +478,10 @@ class QuerySet:
         sql, args = self._build_update_sql(sql_values)
         self.session.execute(sql, args)
 
+    def delete(self):
+        sql, args = self._build_delete_sql()
+        self.session.execute(sql, args)
+
     def _build_where_sql(self):
         where = ' AND '.join(x[0] for x in self.wheres)
         args = [x[1] for x in self.wheres if len(x) > 1]
@@ -538,6 +542,14 @@ class QuerySet:
         args = list(sql_values.values()) + args
         return sql, args
 
+    def _build_delete_sql(self):
+        table_name = self.model.table_name
+        where, args = self._build_where_sql()
+        sql = 'DELETE FROM {table_name} {where};'.format(
+            table_name=table_name,  where=where
+        )
+        return sql, args
+
     def _execute(self):
         if hasattr(self, '_data'):
             return
@@ -551,8 +563,7 @@ class QuerySet:
             self._data.append(instance)
 
     def __len__(self):
-        self._execute()
-        pass
+        return self.count()
 
     def __getitem__(self, index):
         self._execute()
