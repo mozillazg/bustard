@@ -477,10 +477,12 @@ class QuerySet:
                 raise KeyError('{} is invalid field name'.format(kw))
         sql, args = self._build_update_sql(sql_values)
         self.session.execute(sql, args)
+        self._clean_data()
 
     def delete(self):
         sql, args = self._build_delete_sql()
         self.session.execute(sql, args)
+        self._clean_data()
 
     def _build_where_sql(self):
         where = ' AND '.join(x[0] for x in self.wheres)
@@ -562,7 +564,14 @@ class QuerySet:
                 setattr(instance, self.model.fields[nu].name, value)
             self._data.append(instance)
 
+    def _clean_data(self):
+        if hasattr(self, '_data'):
+            delattr(self, '_data')
+
     def __len__(self):
+        if self._limit is not None or self._offset is not None:
+            self._execute()
+            return len(self._data)
         return self.count()
 
     def __getitem__(self, index):

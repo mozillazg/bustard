@@ -2,13 +2,23 @@ language: python
 python:
   - 3.5
 
+addons:
+  postgresql: '9.4'
+
+services:
+  - postgresql
+
 sudo: false
 
 install:
   - travis_retry pip install coveralls
   - travis_retry pip install -r requirements_dev.txt
 
+before_script:
+  - psql -c 'create database exampledb;' -U postgres
+
 script:
+  - export BUSTARD_TEST_PG_URI='postgresql://postgres@localhost/exampledb'
   - pre-commit run --all-files
   - make tests
 

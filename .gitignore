@@ -58,3 +58,4 @@ target/
 *~
 venv/
 .python-version
+tests/_orm.py
