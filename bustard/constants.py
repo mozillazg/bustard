@@ -112,3 +112,15 @@ HTTP_STATUS_CODES = {
     507:    'Insufficient Storage',
     510:    'Not Extended'
 }
+
+
+# 默认配置
+CONFIGURE = {
+    'DEBUG': False,
+    'SESSION_COOKIE_NAME': 'sid',
+    'SESSION_COOKIE_MAX_AGE': None,
+    'SESSION_COOKIE_DOMAIN': None,
+    'SESSION_COOKIE_PATH': '/',
+    'SESSION_COOKIE_SECURE': False,
+    'SESSION_COOKIE_HTTPONLY': True,
+}

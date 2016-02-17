@@ -97,7 +97,7 @@ class WSGIServer(object):
     def parse_headers(self, raw_request):
         header_string = to_text(raw_request.split(b'\r\n\r\n', 1)[0])
         self.headers = headers = {}
-        for header in header_string.splitlines()[1:-1]:
+        for header in header_string.splitlines()[1:]:
             k, v = header.split(':', 1)
             if headers.get(k):
                 headers[k] += ', ' + v.strip()  # 多个同名 header

@@ -7,9 +7,10 @@ A tiny web framework powered by Python.
 
 ## features
 
-* template
 * router
 * orm
+* request and response
+* template
 * wsgi server
 
 
@@ -20,7 +21,11 @@ from bustard.app import Bustard
 
 app = Bustard()
 
+
 @app.route('/')
 def helloword(request):
     return 'hello world'
+
+if __name__ == '__main__':
+    app.run()
 ```

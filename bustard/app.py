@@ -3,6 +3,7 @@ import collections
 import inspect
 import os
 
+from .constants import CONFIGURE
 from .exceptions import HTTPException
 from .http import Request, Response
 from .router import Router
@@ -10,6 +11,7 @@ from .template import Template
 from .testing import Client
 from .utils import to_bytes
 from .wsgi_server import make_server
+from . import sessions
 
 NOTFOUND_HTML = b"""
 <html>
@@ -19,6 +21,10 @@ NOTFOUND_HTML = b"""
 
 
 class Bustard(object):
+    session_class = sessions.MemorySession
+    before_request_hooks = (sessions.before_request_hook,)
+    after_request_hooks = (sessions.after_request_hook,)
+
     def __init__(self, name='', template_dir='',
                  template_default_context=None):
         self.name = name
@@ -29,8 +35,18 @@ class Bustard(object):
         else:
             self.template_default_context = {}
         self.template_default_context.setdefault('url_for', self.url_for)
+
         self._before_request_hooks = []
+        self._before_request_hooks.extend(self.before_request_hooks)
         self._after_request_hooks = []
+        self._after_request_hooks.extend(self.after_request_hooks)
+
+        self._config = {}
+        self._config.update(CONFIGURE)
+
+    @property
+    def config(self):
+        return self._config
 
     def render_template(self, template_name, **kwargs):
         return render_template(
@@ -59,21 +75,21 @@ class Bustard(object):
         path = environ['PATH_INFO']
         method = environ['REQUEST_METHOD']
         func, methods, func_kwargs = self.url_resolve(path)
-        if func is None:
-            return self.notfound()
-        if method not in methods:
-            return self.abort(405)
 
-        request = Request(environ)
-        result = self.handle_before_request_hooks(request, view_func=func)
-        if isinstance(result, Response):
-            response = result
-        else:
-            try:
+        try:
+            if func is None:
+                self.notfound()
+            if method not in methods:
+                self.abort(405)
+            request = Request(environ)
+            result = self.handle_before_request_hooks(request, view_func=func)
+            if isinstance(result, Response):
+                response = result
+            else:
                 response = self.handle_view(request, func, func_kwargs)
-            except HTTPException as ex:
-                response = ex.response
-        self.handle_after_request_hooks(request, response, view_func=func)
+            self.handle_after_request_hooks(request, response, view_func=func)
+        except HTTPException as ex:
+            response = ex.response
 
         return self._start_response(response)
 
@@ -116,9 +132,9 @@ class Bustard(object):
         hooks = self._before_request_hooks
         for hook in hooks:
             if len(inspect.signature(hook).parameters) > 1:
-                result = hook(request, view_func)
+                result = hook(request, view_func, self)
             else:
-                result = hook(request, view_func)
+                result = hook(request)
             if isinstance(result, Response):
                 return result
 
@@ -130,7 +146,7 @@ class Bustard(object):
         hooks = self._after_request_hooks
         for hook in hooks:
             if len(inspect.signature(hook).parameters) > 2:
-                hook(request, response, view_func)
+                hook(request, response, view_func, self)
             else:
                 hook(request, response)
 

@@ -105,3 +105,7 @@ def parse_basic_auth_header(value):
             username=to_text(username),
             password=to_text(password)
         )
+
+
+def cookie_date():
+    pass
