@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
+import collections
+import mimetypes
 import itertools
 import io
+import random
 import sys
+import time
 import urllib
 
 from .http import Headers, Response
@@ -25,19 +29,66 @@ def run_wsgi_app(app, environ):
     return app_iter, response[0], Headers.from_list(response[1])
 
 
+def build_multipart_body(data, files):
+    body = io.BytesIO()
+    values = collections.OrderedDict()
+    values.update(data or {})
+    values.update(files or {})
+
+    def write(content):
+        body.write(to_bytes(content))
+    boundary = '{0}{1}'.format(time.time(), random.random())
+
+    for name, value in values.items():
+        write('--{}\r\n'.format(boundary))
+        write('Content-Disposition: form-data; name="{}"'.format(name))
+
+        if isinstance(value, dict):  # file field
+            filename = value.get('name', '')
+            if filename:
+                write('; filename="{}"'.format(filename))
+            write('\r\n')
+            content_type = (
+                value.get('content_type') or
+                mimetypes.guess_type(filename)[0] or
+                'application/octet-stream')
+            write('Content-Type: {}\r\n'.format(content_type))
+            if not content_type.startswith('text'):
+                write('Content-Transfer-Encoding: binary')
+            value = value['file']
+
+        write('\r\n\r\n')
+        write(value)
+        write('\r\n')
+    write('--{}--\r\n'.format(boundary))
+    length = body.tell()
+    body.seek(0)
+    return body, length, boundary
+
+
 class Client(object):
 
-    def __init__(self, app, host='localhost', port='80'):
+    def __init__(self, app, host='localhost', port='80', cookies=None):
         self.app = app
         self.host = host
         self.environ_builder = EnvironBuilder()
+        self.cookies = cookies or {}
 
     def open(self, path, method, params=None, data=None,
-             body=None, headers=None, cookies=None,
+             files=None, headers=None, cookies=None,
              content_type='', charset='utf-8'):
         if isinstance(headers, dict):
             headers = Headers(headers)
         content_type = content_type or (headers or {}).get('Content-Type', '')
+        cookies = cookies or {}
+        cookies.update(self.cookies)
+        body = None
+        if files:
+            body_reader, _, boundary = build_multipart_body(data, files)
+            body = body_reader.read()
+            body_reader.close()
+            data = None
+            content_type = 'multipart/form-data; boundary={}'.format(boundary)
 
         environ = self.environ_builder.build_environ(
             path=path, method=method, params=params,
@@ -50,6 +101,10 @@ class Client(object):
         response = Response(b''.join(app_iter), status_code=status_code,
                             headers=headers,
                             content_type=content_type)
+        self.cookies.update({
+            k: v.value
+            for (k, v) in response.cookies.items()
+        })
         return response
 
     # get = functools.partialmethod(open, method='GET', data=None)

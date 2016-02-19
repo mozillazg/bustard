@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import cgi
 from http.cookies import SimpleCookie
+import io
 import json
 
 from .constants import HTTP_STATUS_CODES
 from .utils import (
     json_dumps_default, MultiDict, parse_query_string,
-    to_header_key, to_text, parse_basic_auth_header
+    to_header_key, to_text, to_bytes, parse_basic_auth_header
 )
 
 
@@ -44,15 +45,17 @@ class Request(object):
 
     @property
     def form(self):
-        if self.method not in ['POST', 'PUT', 'PATCH', 'DELETE'] or (
-                self.content_type not in [
-                    'application/x-www-form-urlencoded',
-                    'multipart/form-data',
-                ]
-        ):
+        if self.method not in ['POST', 'PUT', 'PATCH', 'DELETE']:
             return {}
-        self.parse_form_data()
-        return MultiDict(self._form)
+        content_type = self.content_type
+        if (
+            content_type.startswith('multipart/form-data; boundary=') or
+            content_type.startswith('application/x-www-form-urlencoded')
+        ):
+            self.parse_form_data()
+            return MultiDict(self._form)
+        else:
+            return {}
 
     def parse_form_data(self):
         if hasattr(self, '_form'):
@@ -66,8 +69,9 @@ class Request(object):
                 values = fields[key]
                 if isinstance(values, list):
                     _form[key] = [x.value for x in values]
-                elif getattr(values, 'filename', None) is not None:
-                    _files[key] = values
+                elif 'Content-Type' in values.headers:
+                    _files[key] = File(values.value, values.filename,
+                                       values.type)
                 else:
                     _form[key] = [values.value]
         self._form = _form
@@ -186,7 +190,13 @@ class Response(object):
             self._headers = _headers
         else:
             self._headers = Headers(_headers)
-        self._cookies = {}
+        self._cookies = SimpleCookie()
+        self._load_cookies_from_headers()
+
+    def _load_cookies_from_headers(self):
+        cookies = self._headers.to_dict().pop('Set-Cookie', [])
+        for cookie in cookies:
+            self._cookies.load(cookie)
 
     @property
     def content(self):
@@ -253,7 +263,7 @@ class Response(object):
             key, value=value, max_age=max_age, expires=expires, path=path,
             domain=domain, secure=secure, httponly=httponly
         )
-        self._cookies[key] = cookie
+        self._cookies.load(cookie)
 
     def delete_cookie(self, key, max_age=0,
                       expires='Thu, 01-Jan-1970 00:00:00 GMT'):
@@ -267,8 +277,7 @@ class Response(object):
         # set-cookies
         headers_list.extend(
             ('Set-Cookie', value.OutputString())
-            for cookie in self.cookies.values()
-            for value in cookie.values()
+            for value in self.cookies.values()
         )
         return headers_list
 
@@ -357,3 +366,15 @@ class Headers(MultiDict):
         else:
             value = to_text(value)
         super(Headers, self).__setitem__(key, value)
+
+
+class File:
+
+    def __init__(self, data, filename,
+                 content_type='application/octet-stream'):
+        self.file = io.BytesIO(to_bytes(data))
+        self.file.name = filename
+        self.file.content_type = content_type
+
+    def __getattr__(self, attr):
+        return getattr(self.file, attr)
