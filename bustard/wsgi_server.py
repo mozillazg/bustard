@@ -72,10 +72,15 @@ class WSGIServer(object):
     def handle_one_request(self):
         self.client_connection, self.client_address = self.socket.accept()
         # self.raw_request = raw_request = self.client_connection.recv(65537)
-        self.raw_request = raw_request = self.client_connection.recv(65536)
+        init_read = 65536
+        self.raw_request = raw_request = self.client_connection.recv(init_read)
 
         self.parse_request(raw_request)
         self.parse_headers(raw_request)
+        length = int(self.headers.get('Content-Length', '0'))
+        while len(self.raw_request) == length:
+            self.raw_request += self.client_connection.recv(init_read)
+
         env = self.get_environ()
 
         print('[%s] "%s %s %s"' % (

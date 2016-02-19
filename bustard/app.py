@@ -10,7 +10,8 @@ from .router import Router
 from .template import Template
 from .testing import Client
 from .utils import to_bytes
-from .wsgi_server import make_server
+# from .wsgi_server import make_server
+from .servers import WsgirefServer
 from . import sessions
 
 NOTFOUND_HTML = b"""
@@ -107,7 +108,7 @@ class Bustard(object):
 
     def _start_response(self, response):
         body = response.body
-        status_code = to_bytes(response.status)
+        status_code = response.status
         headers_list = response.headers_list
         self.start_response(status_code, headers_list)
 
@@ -166,9 +167,9 @@ class Bustard(object):
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
-        httpd = make_server(address, self)
+        httpd = WsgirefServer(self)
         print('WSGIServer: Serving HTTP on %s ...\n' % str(address))
-        httpd.serve_forever()
+        httpd.run(host, port)
 
 
 def render_template(template_name, template_dir='', default_context=None,
