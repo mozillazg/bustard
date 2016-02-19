@@ -1,0 +1,3 @@
+[submodule "examples/bustard-httpbin"]
+	path = examples/bustard-httpbin
+	url = https://github.com/mozillazg/bustard-httpbin.git
