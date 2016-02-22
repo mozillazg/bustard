@@ -6,30 +6,36 @@ from . import wsgi_server
 
 
 class ServerInterface(metaclass=abc.ABCMeta):
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, host='127.0.0.1', port=5000, **options):
+        self.host = host
+        self.port = port
+        self.options = options
 
     @abc.abstractmethod
-    def run(self, host='127.0.0.1', port=5000, **kwargs):
+    def run(self, app):
         pass
 
 
 class BustardServer(ServerInterface):
 
-    def run(self, host='127.0.0.1', port=5000, **kwargs):
-        httpd = wsgi_server.make_server((host, port), self.app)
+    def run(self, app):
+        httpd = wsgi_server.make_server(
+            (self.host, self.port), app, **self.options
+        )
         httpd.serve_forever()
 
 
-class WsgirefServer(ServerInterface):
+class WSGIrefServer(ServerInterface):
 
-    def run(self, host='127.0.0.1', port=5000, **kwargs):
-        httpd = wsgiref.simple_server.make_server(host, port, self.app)
+    def run(self, app):
+        httpd = wsgiref.simple_server.make_server(
+            self.host, self.port, app, **self.options
+        )
         httpd.serve_forever()
 
 
 class WerkzeugfServer(ServerInterface):
 
-    def run(self, host='127.0.0.1', port=5000, **kwargs):
+    def run(self, app):
         from werkzeug.serving import run_simple
-        run_simple(host, port, self.app, **kwargs)
+        run_simple(self.host, self.port, app, self.options)

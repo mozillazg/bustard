@@ -11,7 +11,7 @@ from .template import Template
 from .testing import Client
 from .utils import to_bytes
 # from .wsgi_server import make_server
-from .servers import WsgirefServer
+from .servers import WSGIrefServer
 from . import sessions
 
 NOTFOUND_HTML = b"""
@@ -167,9 +167,9 @@ class Bustard(object):
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
-        httpd = WsgirefServer(self)
+        httpd = WSGIrefServer(host, port)
         print('WSGIServer: Serving HTTP on %s ...\n' % str(address))
-        httpd.run(host, port)
+        httpd.run(self)
 
 
 def render_template(template_name, template_dir='', default_context=None,
