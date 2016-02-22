@@ -44,7 +44,7 @@ class SessionBase(collections.UserDict):
         self.modified = True
 
     def _get_or_create_session_key(self):
-        if not self.session_key:
+        if not self.session_key or not self.exists(self.session_key):
             self.session_key = self._new_session_key()
         return self.session_key
 
@@ -53,6 +53,10 @@ class SessionBase(collections.UserDict):
 
     @abc.abstractmethod
     def create(self):
+        pass
+
+    @abc.abstractmethod
+    def exists(self, session_key=None):
         pass
 
     @abc.abstractmethod
@@ -106,6 +110,10 @@ class MemorySession(SessionBase):
             self.create()
         else:
             self.data = _sessions[self.session_key]
+
+    def exists(self, key):
+        _sessions = self.__class__._sessions
+        return key in _sessions
 
     def create(self):
         self.modified = True
