@@ -1,6 +1,9 @@
 bustard
 -----------
 
+.. image:: https://travis-ci.org/mozillazg/bustard.svg?branch=master
+    :target: https://travis-ci.org/mozillazg/bustard
+
 A tiny web framework powered by Python.
 
 
