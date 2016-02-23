@@ -109,7 +109,7 @@ class Client(object):
 
     # get = functools.partialmethod(open, method='GET', data=None)
     def get(self, path, params=None, **kwargs):
-        return self.open(path, method='HEAD', params=params, **kwargs)
+        return self.open(path, method='GET', params=params, **kwargs)
 
     def options(self, path, **kwargs):
         return self.open(path, method='OPTIONS', **kwargs)

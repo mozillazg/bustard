@@ -119,11 +119,15 @@ class Bustard(object):
 
     def route(self, path, methods=None):
 
-        def wrapper(func):
-            self._router.register(path, func, methods)
-            return func
+        def wrapper(view_func):
+            self._router.register(path, view_func, methods)
+            return view_func
 
         return wrapper
+
+    def add_url_rule(self, path, view_func):
+        methods = view_func.methods
+        self.route(path, methods=methods)(view_func)
 
     def before_request(self, func):
         self._before_request_hooks.append(func)
