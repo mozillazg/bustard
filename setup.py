@@ -24,7 +24,7 @@ packages = [
 ]
 
 requirements = [
-    'psycopg2',
+    # 'psycopg2',
 ]
 
 

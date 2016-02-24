@@ -20,7 +20,10 @@ features
 install
 =============
 
-``pip install bustard``
+::
+
+    pip install bustard
+    pip install psycopg2      # if need orm feature
 
 
 usage
