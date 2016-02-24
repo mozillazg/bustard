@@ -124,3 +124,9 @@ CONFIGURE = {
     'SESSION_COOKIE_SECURE': False,
     'SESSION_COOKIE_HTTPONLY': True,
 }
+
+NOTFOUND_HTML = b"""
+<html>
+    <h1>404 Not Found</h1>
+</html>
+"""

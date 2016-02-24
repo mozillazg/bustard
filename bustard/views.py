@@ -1,4 +1,9 @@
 # -*- coding: utf-8 -*-
+import mimetypes
+import os
+
+from .exceptions import NotFound
+from .http import Response
 
 http_methods = ('get', 'post', 'head', 'options',
                 'delete', 'put', 'trace', 'patch')
@@ -34,3 +39,22 @@ class View:
         cls.methods = methods
         view.methods = methods
         return view
+
+
+class StaticFilesView(View):
+
+    def __init__(self, static_dir):
+        self.static_dir = os.path.abspath(static_dir)
+
+    def get(self, request, path):
+        file_path = os.path.abspath(os.path.join(self.static_dir, path))
+        if not file_path.startswith(self.static_dir):
+            raise NotFound()
+        if not os.path.isfile(file_path):
+            raise NotFound()
+
+        with open(file_path, 'rb') as fp:
+            content = fp.read()
+        content_type = mimetypes.guess_type(file_path)[0]
+        content_type = content_type or 'application/octet-stream'
+        return Response(content, content_type=content_type)

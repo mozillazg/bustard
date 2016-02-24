@@ -4,7 +4,7 @@ import inspect
 import os
 
 from .constants import CONFIGURE
-from .exceptions import HTTPException
+from .exceptions import HTTPException, NotFound
 from .http import Request, Response
 from .router import Router
 from .template import Template
@@ -13,12 +13,6 @@ from .utils import to_bytes
 # from .wsgi_server import make_server
 from .servers import WSGIrefServer
 from . import sessions
-
-NOTFOUND_HTML = b"""
-<html>
-    <h1>404 Not Found</h1>
-</html>
-"""
 
 
 class Bustard(object):
@@ -156,7 +150,7 @@ class Bustard(object):
                 hook(request, response)
 
     def notfound(self):
-        raise HTTPException(Response(NOTFOUND_HTML, status_code=404))
+        raise NotFound()
 
     def abort(self, code):
         raise HTTPException(Response(status_code=code))

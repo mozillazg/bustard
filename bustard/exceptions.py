@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from .constants import NOTFOUND_HTML
+from .http import Response
 
 
 class HTTPException(Exception):
@@ -7,4 +9,5 @@ class HTTPException(Exception):
 
 
 class NotFound(HTTPException):
-    pass
+    def __init__(self):
+        self.response = Response(NOTFOUND_HTML, status_code=404)
