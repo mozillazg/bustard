@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import abc
 import collections
+import contextlib
 import logging
 
 import psycopg2
@@ -413,6 +414,16 @@ class Session:
 
     def query(self, model):
         return QuerySet(self, model)
+
+    @contextlib.contextmanager
+    def transaction(self):
+        try:
+            yield
+        except:
+            self.rollback()
+            raise
+        else:
+            self.commit()
 
 
 class QuerySet:

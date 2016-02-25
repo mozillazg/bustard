@@ -143,6 +143,23 @@ class TestSession:
         session.commit()
         assert user.id is None
 
+    def test_transaction(self, model_context):
+        User = model_context['User']
+        session = model_context['session']
+        with session.transaction():
+            create_user(User, session)
+        session.rollback()
+        assert session.query(User).filter(id=1).count() == 1
+
+    def test_transaction_exception(self, model_context):
+        User = model_context['User']
+        session = model_context['session']
+        with pytest.raises(AssertionError):
+            with session.transaction():
+                create_user(User, session)
+                assert 0 > 1
+        assert session.query(User).filter(id=1).count() == 0
+
 
 class TestQuerySet:
 
