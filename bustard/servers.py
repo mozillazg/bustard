@@ -5,7 +5,7 @@ import wsgiref.simple_server
 from . import wsgi_server
 
 
-class ServerInterface(metaclass=abc.ABCMeta):
+class ServerAdapter(metaclass=abc.ABCMeta):
     def __init__(self, host='127.0.0.1', port=5000, **options):
         self.host = host
         self.port = port
@@ -16,7 +16,7 @@ class ServerInterface(metaclass=abc.ABCMeta):
         pass
 
 
-class BustardServer(ServerInterface):
+class BustardServer(ServerAdapter):
 
     def run(self, app):
         httpd = wsgi_server.make_server(
@@ -25,7 +25,7 @@ class BustardServer(ServerInterface):
         httpd.serve_forever()
 
 
-class WSGIrefServer(ServerInterface):
+class WSGIRefServer(ServerAdapter):
 
     def run(self, app):
         httpd = wsgiref.simple_server.make_server(
@@ -34,7 +34,7 @@ class WSGIrefServer(ServerInterface):
         httpd.serve_forever()
 
 
-class WerkzeugfServer(ServerInterface):
+class WerkzeugfServer(ServerAdapter):
 
     def run(self, app):
         from werkzeug.serving import run_simple

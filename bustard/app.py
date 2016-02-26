@@ -10,8 +10,7 @@ from .router import Router
 from .template import Template
 from .testing import Client
 from .utils import to_bytes
-# from .wsgi_server import make_server
-from .servers import WSGIrefServer
+from .servers import WSGIRefServer
 from . import sessions
 
 
@@ -165,7 +164,7 @@ class Bustard(object):
 
     def run(self, host='127.0.0.1', port=5000):
         address = (host, port)
-        httpd = WSGIrefServer(host, port)
+        httpd = WSGIRefServer(host, port)
         print('WSGIServer: Serving HTTP on %s ...\n' % str(address))
         httpd.run(self)
 
