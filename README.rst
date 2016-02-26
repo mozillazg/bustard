@@ -25,8 +25,8 @@ install
     pip install psycopg2      # if you need orm feature
 
 
-usage
-==============
+Getting Started
+===================
 
 ::
 
@@ -41,6 +41,13 @@ usage
 
     if __name__ == '__main__':
         app.run()
+
+Just save it as hello.py and run it ::
+
+    $ python hello.py
+    WSGIServer: Serving HTTP on ('0.0.0.0', 5000) ...
+
+Now visit http://localhost:5000, and you should see ``hello world``.
 
 
 .. |Build| image:: https://img.shields.io/travis/mozillazg/bustard/master.svg
