@@ -1,10 +1,9 @@
 bustard
 -----------
 
-.. image:: https://travis-ci.org/mozillazg/bustard.svg?branch=master
-    :target: https://travis-ci.org/mozillazg/bustard
+|Build| |Coverage| |Pypi version|
 
-A tiny web framework powered by Python.
+A tiny WSGI web framework.
 
 
 features
@@ -23,7 +22,7 @@ install
 ::
 
     pip install bustard
-    pip install psycopg2      # if need orm feature
+    pip install psycopg2      # if you need orm feature
 
 
 usage
@@ -42,3 +41,11 @@ usage
 
     if __name__ == '__main__':
         app.run()
+
+
+.. |Build| image:: https://img.shields.io/travis/mozillazg/bustard/master.svg
+   :target: https://travis-ci.org/mozillazg/bustard
+.. |Coverage| image:: https://img.shields.io/coveralls/mozillazg/bustard/master.svg
+   :target: https://coveralls.io/r/mozillazg/bustard
+.. |PyPI version| image:: https://img.shields.io/pypi/v/bustard.svg
+   :target: https://pypi.python.org/pypi/bustard
