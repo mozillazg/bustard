@@ -2,7 +2,7 @@
 
 '''A tiny WSGI web framework'''
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __title__ = 'bustard'
 __author__ = 'mozillazg'
 __license__ = 'MIT'
