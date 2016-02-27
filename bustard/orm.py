@@ -523,6 +523,9 @@ class QuerySet:
         where, args = self._build_where_sql()
         if count:
             column_names = 'COUNT(*)'
+            order_by = ''
+            offset = ''
+            limit = ''
         else:
             column_names = ', '.join(
                 '{column_name} AS {table_name}_{column_name}'.format(
@@ -530,9 +533,9 @@ class QuerySet:
                 )
                 for field in self.model.fields
             )
-        offset = self._build_offset_sql()
-        limit = self._build_limit_sql()
-        order_by = self._build_order_by_sql()
+            order_by = self._build_order_by_sql()
+            offset = self._build_offset_sql()
+            limit = self._build_limit_sql()
 
         sql = (
             'SELECT {column_names} FROM {table_name} {where}'
