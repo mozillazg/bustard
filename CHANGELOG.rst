@@ -7,6 +7,9 @@ ChangeLog
 
 * [improve] refactoring template engine
 * [bugfix] fix orm.queryset.count: don't include limit and offset in sql
+* [improve] improve orm.session.connect: auto reconnect
+* [bugfix] fix testing about post form
+* [new] testing.open support 'follow_redirects=False' argument
 
 
 0.1.2 (2016-02-26)

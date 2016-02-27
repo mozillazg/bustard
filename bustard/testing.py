@@ -76,7 +76,7 @@ class Client(object):
 
     def open(self, path, method, params=None, data=None,
              files=None, headers=None, cookies=None,
-             content_type='', charset='utf-8'):
+             content_type='', charset='utf-8', follow_redirects=False):
         if isinstance(headers, dict):
             headers = Headers(headers)
         content_type = content_type or (headers or {}).get('Content-Type', '')
@@ -105,6 +105,9 @@ class Client(object):
             k: v.value
             for (k, v) in response.cookies.items()
         })
+        if status_code in (301, 302, 303, 307) and follow_redirects:
+            new_path = headers['Location']
+            return self.open(new_path, 'GET')
         return response
 
     # get = functools.partialmethod(open, method='GET', data=None)
@@ -176,6 +179,8 @@ class EnvironBuilder(object):
         if isinstance(params, (dict, list, tuple)):
             query_string = query_string + '&' + urllib.parse.urlencode(params)
 
+        if data:
+            content_type = 'application/x-www-form-urlencoded'
         if isinstance(data, dict):
             body = to_bytes(urllib.parse.urlencode(data), encoding=charset)
         elif data:
