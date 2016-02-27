@@ -45,7 +45,7 @@ Getting Started
 Just save it as hello.py and run it ::
 
     $ python hello.py
-    WSGIServer: Serving HTTP on ('0.0.0.0', 5000) ...
+    WSGIServer: Serving HTTP on ('127.0.0.1', 5000) ...
 
 Now visit http://localhost:5000, and you should see ``hello world``.
 
