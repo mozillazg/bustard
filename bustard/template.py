@@ -15,6 +15,7 @@
 
 """
 import builtins
+import keyword
 import os
 import re
 
@@ -124,9 +125,15 @@ class Template(object):
         # 将函数内的执行结果保存在 result 中
         code.add_line('%s = []' % result_var)
         # escape, noescape
-        code.add_line('escape = context["escape"]')
-        code.add_line('noescape = context["noescape"]')
-        code.add_line('to_text = context["to_text"]')
+        # code.add_line('escape = context["escape"]')
+        # code.add_line('noescape = context["noescape"]')
+        # code.add_line('to_text = context["to_text"]')
+        # code.add_line(
+        #     '__code = "\\n".join("%s=context[\'%s\']" % (__k, __k) '
+        #     'for __k in context) '
+        # )
+        # code.add_line('exec(__code)')
+        code.add_line('globals().update(context)')
 
         self.tpl_text = text
         # 模板中出现过的全局变量
@@ -225,7 +232,7 @@ class Template(object):
     def define_global_vars(self):
         # 定义模板中用到的全局变量
         for name in (self.global_vars - self.tmp_vars):
-            if name not in self.up_vars:
+            if name not in self.up_vars and not keyword.iskeyword(name):
                 self.section_vars.add_line('%s = context["%s"]' % (name, name))
 
     def render(self, **context):
