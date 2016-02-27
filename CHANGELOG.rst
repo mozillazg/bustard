@@ -2,6 +2,13 @@ ChangeLog
 ----------
 
 
+0.1.3 (2016-02-26)
+====================
+
+* [improve] refactoring template engine
+* [bugfix] fix orm.queryset.count: don't include limit and offset in sql
+
+
 0.1.2 (2016-02-26)
 ====================
 

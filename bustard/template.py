@@ -15,6 +15,8 @@
 
 """
 import builtins
+import collections
+import dis
 import keyword
 import os
 import re
@@ -125,15 +127,9 @@ class Template(object):
         # 将函数内的执行结果保存在 result 中
         code.add_line('%s = []' % result_var)
         # escape, noescape
-        # code.add_line('escape = context["escape"]')
-        # code.add_line('noescape = context["noescape"]')
-        # code.add_line('to_text = context["to_text"]')
-        # code.add_line(
-        #     '__code = "\\n".join("%s=context[\'%s\']" % (__k, __k) '
-        #     'for __k in context) '
-        # )
-        # code.add_line('exec(__code)')
-        code.add_line('globals().update(context)')
+        code.add_line('escape = context["escape"]')
+        code.add_line('noescape = context["noescape"]')
+        code.add_line('to_text = context["to_text"]')
 
         self.tpl_text = text
         # 模板中出现过的全局变量
@@ -163,18 +159,13 @@ class Template(object):
                 continue
             # {{ abc }}
             elif token.startswith(self.TOKEN_EXPR_START):
-                global_var = self.strip_token(token, self.TOKEN_EXPR_START,
-                                              self.TOKEN_EXPR_END).strip()
-                global_var = self.collect_var(global_var)
-
+                _var = self.strip_token(token, self.TOKEN_EXPR_START,
+                                        self.TOKEN_EXPR_END).strip()
+                self.collect_vars(_var)
                 if self.auto_escape:
-                    self.buffered.append(
-                        'escape(%s)' % self.wrap_var(global_var)
-                    )
+                    self.buffered.append('escape(%s)' % _var)
                 else:
-                    self.buffered.append(
-                        'to_text(%s)' % self.wrap_var(global_var)
-                    )
+                    self.buffered.append('to_text(%s)' % _var)
 
             # {% blala %}
             elif token.startswith(self.TOKEN_TAG_START):
@@ -183,15 +174,19 @@ class Template(object):
                                            self.TOKEN_TAG_END)
                 words = express.split()
                 if words[0] == 'if':   # {% if xx %}
-                    global_var = self.collect_var(' '.join(words[1:]))
+                    _var = ' '.join(words[1:])
+                    expr = 'if %s:' % _var
+                    self.collect_vars(expr + 'pass')
 
-                    self.code.add_line('if %s:' % self.wrap_var(global_var))
+                    self.code.add_line(expr)
                     self.code.forward_indent()
                 elif words[0] == 'elif':  # {% elif xx %}
                     self.code.back_indent()
-                    global_var = self.collect_var(' '.join(words[1:]))
+                    _var = ' '.join(words[1:])
+                    expr = 'elif %s:' % _var
+                    self.collect_vars(expr.replace('elif', 'if', 1) + 'pass')
 
-                    self.code.add_line('elif %s:' % self.wrap_var(global_var))
+                    self.code.add_line(expr)
                     self.code.forward_indent()
                 elif words[0] == 'else':  # {% else %}
                     self.code.back_indent()
@@ -199,14 +194,10 @@ class Template(object):
                     self.code.forward_indent()
 
                 elif words[0] == 'for':  # {% for x in y %}
-                    in_index = words.index('in')
-                    tmp_var = self.collect_tmp_var(' '.join(words[1:in_index]))
-                    global_var = self.collect_var(
-                        ' '.join(words[in_index + 1:]),
-                    )
-
-                    self.code.add_line('for %s in %s:'
-                                       % (self.wrap_var(tmp_var), global_var))
+                    _var = ' '.join(words[1:])
+                    expr = 'for %s :' % _var
+                    self.collect_vars(expr + 'pass')
+                    self.code.add_line(expr)
                     self.code.forward_indent()
 
                 elif words[0].startswith('end'):  # {% endif %}, {% endfor %}
@@ -258,46 +249,13 @@ class Template(object):
             ).code
             return self.func_name, _code
 
-    def collect_var(self, var):
-        """将模板中出现的变量加入到 global_vars 中"""
-        var = var.strip()
-        self._collect_var(var, self.global_vars)
-        return var
-
-    def collect_tmp_var(self, var):
-        """收集循环中定义的临时变量"""
-        var = var.strip()
-        self._collect_var(var, self.tmp_vars)
-        return var
-
-    def _collect_var(self, var, collect):
-        # 不处理 {{ "abc" }}
-        if (not var) or var.startswith('"') or var.startswith('\''):
-            return
-
-        var = re.sub(r'"[^"]*"', '', var)
-        var = re.sub(r'\'[^\']*\'', '', var)
-        _vars = re.split(r'[,\s\(\)\[\]]+', var)
-        if len(_vars) > 1:   # {% if len(foobar) %}
-            for _var in _vars:
-                _var = _var.strip()
-                # {{ foobar(abc=1) }}, a[2]
-                if (re.match(r'^\w+\s*=[\'"\d]', _var) or
-                        re.match(r'^\d', _var)):
-                    continue
-                # {{ foobar(abc=efg) }}
-                elif re.match(r'^\w+\s*=', _var):
-                    _var = _var.split('=')[1]
-                self._collect_var(_var, collect)
-        if re.match(r'^[a-zA-Z_](\w+)?', _vars[0]):
-            _var = _vars[0].split('.')[0]
-            collect.add(_var)
-
-    def wrap_var(self, var):
-        """处理变量, 将临时变量的名称增加 _ 前缀"""
-        var = var.strip()
-        self.collect_var(var)
-        return var
+    def collect_vars(self, line):
+        code = compile(line, '<code>', 'exec')
+        names = parse_vars(code)
+        for name in names.load_names:
+            self.global_vars.add(name)
+        for name in names.store_names:
+            self.tmp_vars.add(name)
 
     def flush_buffer(self):
         self.code.add_line('%s.extend([%s])'
@@ -308,6 +266,40 @@ class Template(object):
         text = text.replace(start, '', 1)
         text = text.replace(end, '', 1)
         return text
+
+
+re_parse_dis_names = re.compile('''
+    (?:LOAD_NAME[^(]+
+    \(
+    (?P<load_name>\w+)
+    \)
+    )
+    |
+    (?:STORE_NAME[^(]+
+    \(
+    (?P<store_name>\w+)
+    \)
+    )
+''', re.X)
+
+
+class Writer:
+    def __init__(self):
+        self.data = ''
+
+    def write(self, content):
+        self.data += content
+
+
+def parse_vars(code):
+    writer = Writer()
+    dis.dis(code, file=writer)
+    names = re_parse_dis_names.findall(writer.data)
+    load_names = [x[0] for x in names if x[0]]
+    store_names = [x[1] for x in names if x[1]]
+
+    return collections.namedtuple('Names', 'load_names, store_names'
+                                  )(load_names, store_names)
 
 
 class NoescapeText:

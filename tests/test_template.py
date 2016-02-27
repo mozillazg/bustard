@@ -17,11 +17,11 @@ def echo(*args, **kwargs):
 
 
 test_data = (
-    # 变量
+    # var
     ('{{ abc }}', {'abc': 'foobar'}, 'foobar'),
     ('b{{ abc }}c', {'abc': 'foobar'}, 'bfoobarc'),
     ('{{ abc }', {'abc': 'foobar'}, '{{ abc }'),
-    # 注释
+    # comment
     ('{# abc #}', {'abc': 'foobar'}, ''),
     # index
     ('{{ abc[1] }}', {'abc': [1, 2]}, '2'),
@@ -33,10 +33,14 @@ test_data = (
     # func
     ('{{ echo(1, 2, 3, a=1, b=a) }}', {'echo': echo, 'a': 4},
      '((1, 2, 3), [(&apos;a&apos;, 1), (&apos;b&apos;, 4)])'),
+
     # if
     ('{% if abc %}true{% endif %}', {'abc': True}, 'true'),
+    ('{% if "a" in abc %}true{% endif %}', {'abc': 'aa'}, 'true'),
+    ('{% if a in abc %}true{% endif %}', {'a': 'a', 'abc': 'aa'}, 'true'),
     # if + func
     ('{% if len(abc) %}true{% endif %}', {'abc': 'abc'}, 'true'),
+    ('{% if len(abc) > 1 %}true{% endif %}', {'abc': 'aa'}, 'true'),
     # if ... else ...
     ('{% if abc %}true{% else %}false{% endif %}', {'abc': ''}, 'false'),
 
