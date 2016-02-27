@@ -345,11 +345,14 @@ class Session:
         cls._bind = bind
 
     def connect(self):
-        self.connection = self.bind.connect()
-        self.cursor = self.connection.cursor()
+        if (not hasattr(self, 'connection')) or self.connection.closed:
+            self.connection = self.bind.connect()
+        if (not hasattr(self, 'cursor')) or self.cursor.closed:
+            self.cursor = self.connection.cursor()
 
     def execute(self, sql, args):
         logger.debug('execute sql: %s, args: %s', sql, args)
+        self.connect()
         return self.cursor.execute(sql, args)
 
     def fetchone(self):
