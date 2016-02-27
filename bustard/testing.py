@@ -179,10 +179,9 @@ class EnvironBuilder(object):
         if isinstance(params, (dict, list, tuple)):
             query_string = query_string + '&' + urllib.parse.urlencode(params)
 
-        if data:
-            content_type = 'application/x-www-form-urlencoded'
         if isinstance(data, dict):
             body = to_bytes(urllib.parse.urlencode(data), encoding=charset)
+            content_type = 'application/x-www-form-urlencoded'
         elif data:
             body = to_bytes(data, encoding=charset)
 
