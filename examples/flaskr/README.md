@@ -1,8 +1,8 @@
 
 
 1. create database
-2. creat tables: `bustardr.init_db()`
-3. `python bustardr.py`
+2. creat tables: `flaskr.init_db()`
+3. `python flaskr.py`
 
 
 

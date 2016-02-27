@@ -25,7 +25,7 @@ USERNAME = 'admin'
 PASSWORD = 'passwd'
 PG_URI = 'postgresql://dbuser:password@localhost/example_bustardr'
 engine = Engine(PG_URI)
-session = Session(engine)
+db_session = Session(engine)
 app = Bustard(__name__, template_dir=TEMPLATE_DIR)
 app.add_url_rule('/static/<path>',
                  StaticFilesView.as_view(static_dir=STATIC_DIR))
@@ -41,7 +41,7 @@ def drop_db():
 
 @app.route('/')
 def show_entries(request):
-    entries = session.query(Entry).filter()
+    entries = db_session.query(Entry).filter().order_by(Entry.id.desc)
     return app.render_template('show_entries.html', entries=entries,
                                session=request.session)
 
@@ -52,8 +52,8 @@ def add_entry(request):
         app.abort(401)
     entry = Entry(title=request.form['title'],
                   content=request.form['content'])
-    session.insert(entry)
-    session.commit()
+    db_session.insert(entry)
+    db_session.commit()
     return redirect(app.url_for('show_entries'))
 
 
@@ -73,8 +73,8 @@ def login(request):
 
 
 @app.route('/logout')
-def logut():
-    session.pop('logged_in', None)
+def logout(request):
+    request.session.pop('logged_in', None)
     return redirect(app.url_for('show_entries'))
 
 if __name__ == '__main__':
