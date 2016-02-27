@@ -1,0 +1,24 @@
+{% include "header.html" %}
+
+  {% if 'logged_in' in session %}
+    <form action="{{ url_for('add_entry') }}" method="post" class="add-entry">
+      <dl>
+        <dt>Title:
+        <dd><input type="text" size="30" name="title">
+        <dt>Text:
+        <dd><textarea name="content" rows="5" cols="40"></textarea>
+        <dd><input type="submit" value="Share">
+      </dl>
+    </form>
+  {% endif %}
+  <ul class="entries">
+  {% if entries %}
+    {% for entry in entries %}
+      <li><h2>{{ entry.title }}</h2>{{ noescape(entry.content) }}</li>
+    {% endfor %}
+  {% else %}
+    <li><em>Unbelievable.  No entries here so far</em></li>
+  {% endif %}
+  </ul>
+
+{% include "footer.html" %}
