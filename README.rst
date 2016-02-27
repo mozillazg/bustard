@@ -13,7 +13,7 @@ features
 * orm
 * request and response
 * cookies and session
-* template
+* template engine
 * wsgi server
 
 install
