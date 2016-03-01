@@ -70,6 +70,8 @@ test_data = (
     ('<a>{{ title }}</a>', {'title': '<a>'}, '<a>&lt;a&gt;</a>'),
     # noescape
     ('<a>{{ noescape(title) }}</a>', {'title': '<a>'}, '<a><a></a>'),
+
+    ('{{ list(map(lambda x: x * 2, [1, 2, 3])) }}', {}, '[2, 4, 6]'),
 )
 
 

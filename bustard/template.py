@@ -82,8 +82,8 @@ class Template(object):
                  pre_compile=True,
                  indent=0, template_dir='',
                  up_vars=None,
-                 func_name='render_function',
-                 result_var='result',
+                 func_name='__render_function',
+                 result_var='__result',
                  auto_escape=True
                  ):
         self.tokens_re = re.compile(r'''(?sx)(
@@ -173,40 +173,36 @@ class Template(object):
                 express = self.strip_token(token, self.TOKEN_TAG_START,
                                            self.TOKEN_TAG_END)
                 words = express.split()
-                if words[0] == 'if':   # {% if xx %}
+                tag_name = words[0]
+                # {% if xxx %}, {% elif xxx %}, {% for xxx %}
+                if tag_name in ('if', 'elif', 'for'):
+                    if tag_name in ('elif',):
+                        self.code.back_indent()
+
                     _var = ' '.join(words[1:])
-                    expr = 'if %s:' % _var
-                    self.collect_vars(expr + 'pass')
+                    expr = '{0} {1}:'.format(tag_name, _var)
+
+                    _valid_line = expr + 'pass'
+                    if tag_name == 'elif':
+                        _valid_line = _valid_line.replace('elif', 'if', 1)
+                    self.collect_vars(_valid_line)
 
                     self.code.add_line(expr)
                     self.code.forward_indent()
-                elif words[0] == 'elif':  # {% elif xx %}
+
+                # {% else %}
+                elif tag_name in ('else',):
                     self.code.back_indent()
-                    _var = ' '.join(words[1:])
-                    expr = 'elif %s:' % _var
-                    self.collect_vars(expr.replace('elif', 'if', 1) + 'pass')
-
-                    self.code.add_line(expr)
-                    self.code.forward_indent()
-                elif words[0] == 'else':  # {% else %}
-                    self.code.back_indent()
-                    self.code.add_line('else:')
+                    self.code.add_line('{}:'.format(tag_name))
                     self.code.forward_indent()
 
-                elif words[0] == 'for':  # {% for x in y %}
-                    _var = ' '.join(words[1:])
-                    expr = 'for %s :' % _var
-                    self.collect_vars(expr + 'pass')
-                    self.code.add_line(expr)
-                    self.code.forward_indent()
-
-                elif words[0].startswith('end'):  # {% endif %}, {% endfor %}
-                    if words[0] == 'endfor':   # 排除循环过程中产生的临时变量
+                elif tag_name.startswith('end'):  # {% endif %}, {% endfor %}
+                    if tag_name == 'endfor':   # 排除循环过程中产生的临时变量
                         self.global_vars = self.global_vars - self.tmp_vars
                         self.tmp_vars.clear()
                     self.code.back_indent()
 
-                elif words[0] == 'include':
+                elif tag_name == 'include':
                     # 保存当前 locals
                     path = ''.join(words[1:]).strip().strip('\'"')
                     func_name, _code = self.handle_include(path)
@@ -237,17 +233,21 @@ class Template(object):
 
     def handle_include(self, path):
         path = os.path.join(self.base_dir, path)
+        _hash = str(hash(path)).replace('-', '_').replace('.', '_')
+        func_name = self.func_name + _hash
+        result_var = self.result_var + _hash
         up_vars = set()
         up_vars.update(self.up_vars)
         up_vars.update(self.global_vars)
         with open(path, encoding='utf-8') as f:
-            _code = Template(
-                f.read(), self.context,
+            _code = self.__class__(
+                f.read(), context=self.context,
                 pre_compile=False, indent=self.code.indent_level,
                 template_dir=self.base_dir,
-                up_vars=up_vars, auto_escape=self.auto_escape
+                up_vars=up_vars, auto_escape=self.auto_escape,
+                func_name=func_name, result_var=result_var
             ).code
-            return self.func_name, _code
+            return func_name, _code
 
     def collect_vars(self, line):
         code = compile(line, '<code>', 'exec')
