@@ -68,6 +68,9 @@ class CodeBuilder(object):
     def __str__(self):
         return ''.join(str(s) for s in self.source_code)
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class Template(object):
     TOKEN_EXPR_START = '{{'
@@ -98,6 +101,14 @@ class Template(object):
                     token_comment_end=re.escape(self.TOKEN_COMMENT_END),
                     )
         )
+        self.extends_re = re.compile(
+            r'^{%\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+%}'
+        )
+        self.block_re = re.compile(r'''
+            {%\s+block\s+(?P<name>\w+)\s+%}
+            (?P<code>.*?)
+            {%\s+endblock(?:\s+\1)?\s+%}
+        ''', re.DOTALL | re.VERBOSE)
 
         self.context = {k: v
                         for k, v in builtins.__dict__.items()
@@ -125,7 +136,7 @@ class Template(object):
         # 定义 context 内的变量
         self.section_vars = code.add_section()
         # 将函数内的执行结果保存在 result 中
-        code.add_line('%s = []' % result_var)
+        code.add_line('%s = []' % self.result_var)
         # escape, noescape
         code.add_line('escape = context["escape"]')
         code.add_line('noescape = context["noescape"]')
@@ -147,6 +158,10 @@ class Template(object):
             self.render_function = namespace[func_name]
 
     def parse_text(self, text):
+        extends_text = self.handle_extends(text)
+        if extends_text is not None:
+            return self.parse_text(extends_text)
+
         tokens = self.tokens_re.split(text)
         # express_stack = []
 
@@ -201,20 +216,44 @@ class Template(object):
                         self.global_vars = self.global_vars - self.tmp_vars
                         self.tmp_vars.clear()
                     self.code.back_indent()
+                    self.flush_buffer()
 
-                elif tag_name == 'include':
-                    # 保存当前 locals
+                elif tag_name in ('include',):
                     path = ''.join(words[1:]).strip().strip('\'"')
-                    func_name, _code = self.handle_include(path)
-                    self.code.source_code.append(_code)
+                    _template = self.handle_include(path)
+                    self.code.source_code.append(_template.code)
                     self.code.add_line('%s.append(%s(context))'
-                                       % (self.result_var, func_name))
+                                       % (self.result_var, _template.func_name)
+                                       )
 
         self.define_global_vars()
-
         self.flush_buffer()
         self.code.add_line('return "".join(%s)' % self.result_var)
         self.code.back_indent()
+
+    def handle_extends(self, text):
+        match = self.extends_re.match(text)
+        if match:
+            extra_text = self.extends_re.sub('', text, count=1)
+            blocks = self.get_blocks(extra_text)
+            path = os.path.join(self.base_dir, match.group('path'))
+            with open(path, encoding='utf-8') as fp:
+                return self.replace_blocks(fp.read(), blocks)
+        else:
+            return None
+
+    def get_blocks(self, text):
+        return {
+            name: code
+            for (name, code) in self.block_re.findall(text)
+        }
+
+    def replace_blocks(self, extends_text, blocks):
+        def replace(match):
+            name = match.group('name')
+            code = match.group('code')
+            return blocks.get(name) or code
+        return self.block_re.sub(replace, extends_text)
 
     def define_global_vars(self):
         # 定义模板中用到的全局变量
@@ -229,7 +268,8 @@ class Template(object):
         if context is not None:
             _context.update(context)
 
-        return self.render_function(_context)
+        html = self.render_function(_context)
+        return self.cleanup_extra_whitespaces(html)
 
     def handle_include(self, path):
         path = os.path.join(self.base_dir, path)
@@ -240,14 +280,14 @@ class Template(object):
         up_vars.update(self.up_vars)
         up_vars.update(self.global_vars)
         with open(path, encoding='utf-8') as f:
-            _code = self.__class__(
+            _template = self.__class__(
                 f.read(), context=self.context,
                 pre_compile=False, indent=self.code.indent_level,
                 template_dir=self.base_dir,
                 up_vars=up_vars, auto_escape=self.auto_escape,
                 func_name=func_name, result_var=result_var
-            ).code
-            return func_name, _code
+            )
+            return _template
 
     def collect_vars(self, line):
         code = compile(line, '<code>', 'exec')
@@ -266,6 +306,9 @@ class Template(object):
         text = text.replace(start, '', 1)
         text = text.replace(end, '', 1)
         return text
+
+    def cleanup_extra_whitespaces(self, text):
+        return re.sub(r'(\s)\s+', r'\1', text)
 
 
 re_parse_dis_names = re.compile('''

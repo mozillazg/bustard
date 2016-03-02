@@ -72,6 +72,8 @@ test_data = (
     ('<a>{{ noescape(title) }}</a>', {'title': '<a>'}, '<a><a></a>'),
 
     ('{{ list(map(lambda x: x * 2, [1, 2, 3])) }}', {}, '[2, 4, 6]'),
+    ('{{ sum(filter(lambda x: x > 2, numbers)) }}',
+     {'numbers': [1, 2, 3, 2, 4]}, '7'),
 )
 
 
@@ -93,3 +95,20 @@ def test_include():
         '<li>3</li>\n'
         '</ul>\n'
     )
+
+
+def test_extends():
+    with open(os.path.join(template_dir, 'child.html')) as fp:
+        template = Template(fp.read(), template_dir=template_dir)
+    expect = '''<html>
+<p>hello</p>
+child_header
+<p>world</p>
+child_footer
+<ul><li>1</li><li>2</li><li>3</li>
+</ul>
+<p>!</p>
+</html>
+'''
+    result = template.render(items=[1, 2, 3])
+    assert result == expect

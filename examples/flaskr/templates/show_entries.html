@@ -1,5 +1,5 @@
-{% include "header.html" %}
-
+{% extends "layout.html" %}
+{% block body %}
   {% if session.get('logged_in') %}
     <form action="{{ url_for('add_entry') }}" method="post" class="add-entry">
       <dl>
@@ -20,5 +20,4 @@
     <li><em>Unbelievable.  No entries here so far</em></li>
   {% endif %}
   </ul>
-
-{% include "footer.html" %}
+{% endblock body %}

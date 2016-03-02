@@ -23,7 +23,7 @@ TEMPLATE_DIR = os.path.join(CURRENT_DIR, 'templates')
 STATIC_DIR = os.path.join(CURRENT_DIR, 'static')
 USERNAME = 'admin'
 PASSWORD = 'passwd'
-PG_URI = 'postgresql://dbuser:password@localhost/example_bustardr'
+PG_URI = 'postgresql://dbuser:password@localhost/example_bustardr_test'
 engine = Engine(PG_URI)
 db_session = Session(engine)
 app = Bustard(__name__, template_dir=TEMPLATE_DIR)
@@ -78,4 +78,5 @@ def logout(request):
     return redirect(app.url_for('show_entries'))
 
 if __name__ == '__main__':
-    app.run()
+    from bustard.servers import WerkzeugfServer
+    WerkzeugfServer(debug=True).run(app)

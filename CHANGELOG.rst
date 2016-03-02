@@ -2,6 +2,12 @@ ChangeLog
 ----------
 
 
+0.1.4 (2016-mm-dd)
+====================
+
+* [new] template engine support ``extends``
+
+
 0.1.3 (2016-02-27)
 ====================
 
@@ -9,7 +15,7 @@ ChangeLog
 * [bugfix] fix orm.queryset.count: don't include limit and offset in sql
 * [improve] improve orm.session.connect: auto reconnect
 * [bugfix] fix testing about post form
-* [new] testing.open support 'follow_redirects=False' argument
+* [new] testing.open support ``follow_redirects=False`` argument
 
 
 0.1.2 (2016-02-26)
