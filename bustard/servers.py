@@ -38,4 +38,4 @@ class WerkzeugfServer(ServerAdapter):
 
     def run(self, app):
         from werkzeug.serving import run_simple
-        run_simple(self.host, self.port, app, self.options)
+        run_simple(self.host, self.port, app, **self.options)
