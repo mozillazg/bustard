@@ -337,8 +337,6 @@ class Session:
 
     def __init__(self, bind=None):
         self.bind = bind or self._bind
-        if self.bind is not None:
-            self.connect()
 
     @classmethod
     def configure(cls, bind):
