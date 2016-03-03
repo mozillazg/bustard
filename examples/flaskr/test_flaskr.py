@@ -2,16 +2,20 @@
 import pytest
 
 import flaskr
+PG_URI = 'postgresql://dbuser:password@localhost/example_bustardr_test'
+engine = flaskr.Engine(PG_URI)
+flaskr.db_session.bind = engine
+flaskr.db_session.connect()
 
 
 @pytest.yield_fixture
 def client(request):
     flaskr.db_session.close()
     client = flaskr.app.test_client()
-    flaskr.init_db()
+    flaskr.MetaData.create_all(engine)
     yield client
     flaskr.db_session.close()
-    flaskr.drop_db()
+    flaskr.MetaData.drop_all(engine)
 
 
 def login(client, username, password):
