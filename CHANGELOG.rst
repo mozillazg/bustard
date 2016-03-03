@@ -2,10 +2,10 @@ ChangeLog
 ----------
 
 
-0.1.4 (2016-mm-dd)
+0.1.4 (2016-03-03)
 ====================
 
-* [new] template engine support ``extends``
+* [new] template engine support extends
 * [improve] refactoring template engine
 * [bugfix] fix WerkzeugfServer.run
 * [improve] don't connect to db when init orm.Session instance
