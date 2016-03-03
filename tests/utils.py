@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 import types
+import os
+
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def copy_func(func, name=None):

@@ -6,6 +6,9 @@ ChangeLog
 ====================
 
 * [new] template engine support ``extends``
+* [improve] refactoring template engine
+* [bugfix] fix WerkzeugfServer.run
+* [improve] don't connect to db when init orm.Session instance
 
 
 0.1.3 (2016-02-27)

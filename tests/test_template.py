@@ -74,6 +74,9 @@ test_data = (
     ('{{ list(map(lambda x: x * 2, [1, 2, 3])) }}', {}, '[2, 4, 6]'),
     ('{{ sum(filter(lambda x: x > 2, numbers)) }}',
      {'numbers': [1, 2, 3, 2, 4]}, '7'),
+
+    ('{{ noescape(str) }}', {}, "<class 'str'>"),
+    ('{{ noescape(abs) }}', {}, '<built-in function abs>'),
 )
 
 
@@ -83,6 +86,17 @@ test_data = (
 )
 def test_base(tpl, context, result):
     assert Template(tpl).render(**context) == result
+
+
+@pytest.mark.parametrize(('tpl', 'context'), [
+    ('{{ hello }}', {}),
+    ('{{ SystemExit }}', {}),
+    ('{{ __name__ }}', {}),
+    ('{{ __import__ }}', {}),
+])
+def test_name_error(tpl, context):
+    with pytest.raises(NameError):
+        assert Template(tpl).render(**context)
 
 
 def test_include():
@@ -107,6 +121,7 @@ child_header
 child_footer
 <ul><li>1</li><li>2</li><li>3</li>
 </ul>
+yes
 <p>!</p>
 </html>
 '''
