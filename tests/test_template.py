@@ -116,7 +116,7 @@ def test_extends():
         template = Template(fp.read(), template_dir=template_dir)
     expect = '''<html>
 <p>hello</p>
-child_header
+child_header parent_header
 <p>world</p>
 child_footer
 <ul><li>1</li><li>2</li><li>3</li>

@@ -1,4 +1,4 @@
 
 * [ ] template engine
-  * [ ] support `{{ block.super }}`
+  * [x] support `{{ block.super }}`
   * [ ] inject `request` object

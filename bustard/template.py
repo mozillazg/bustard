@@ -97,13 +97,15 @@ class Template(object):
                     token_comment_end=re.escape(self.TOKEN_COMMENT_END),
                     )
         )
+        # {% extends "base.html" %}
         self.re_extends = re.compile(r'''
             ^{token_tag_start}\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+
-            {token_tag_end}'''.format(
-                token_tag_start=re.escape(self.TOKEN_TAG_START),
-                token_tag_end=re.escape(self.TOKEN_TAG_END),
-            ), re.VERBOSE
-        )
+            {token_tag_end}
+        '''.format(
+            token_tag_start=re.escape(self.TOKEN_TAG_START),
+            token_tag_end=re.escape(self.TOKEN_TAG_END),
+        ), re.VERBOSE)
+        # {% block header %}...{% endbloc header %}
         self.re_block = re.compile(r'''
             {token_tag_start}\s+block\s+(?P<name>\w+)\s+{token_tag_end}
             (?P<code>.*?)
@@ -112,6 +114,14 @@ class Template(object):
             token_tag_start=re.escape(self.TOKEN_TAG_START),
             token_tag_end=re.escape(self.TOKEN_TAG_END),
         ), re.DOTALL | re.VERBOSE)
+        # {{ block.super }}
+        self.re_block_super = re.compile(r'''
+            {token_expr_start}\s+block\.super\s+
+            {token_expr_end}
+        '''.format(
+            token_expr_start=re.escape(self.TOKEN_EXPR_START),
+            token_expr_end=re.escape(self.TOKEN_EXPR_END),
+        ), re.VERBOSE)
 
         self.context = {
             k: v
@@ -234,8 +244,10 @@ class Template(object):
     def replace_blocks_in_extends(self, extends_text, blocks):
         def replace(match):
             name = match.group('name')
-            code = match.group('code')
-            return blocks.get(name) or code
+            old_code = match.group('code')
+            code = blocks.get(name) or old_code
+            # {{ block.super }}
+            return self.re_block_super.sub(old_code, code)
         return self.re_block.sub(replace, extends_text)
 
     def render(self, **context):
