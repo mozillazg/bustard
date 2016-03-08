@@ -97,14 +97,21 @@ class Template(object):
                     token_comment_end=re.escape(self.TOKEN_COMMENT_END),
                     )
         )
-        self.re_extends = re.compile(
-            r'^{%\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+%}'
+        self.re_extends = re.compile(r'''
+            ^{token_tag_start}\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+
+            {token_tag_end}'''.format(
+                token_tag_start=re.escape(self.TOKEN_TAG_START),
+                token_tag_end=re.escape(self.TOKEN_TAG_END),
+            ), re.VERBOSE
         )
         self.re_block = re.compile(r'''
-            {%\s+block\s+(?P<name>\w+)\s+%}
+            {token_tag_start}\s+block\s+(?P<name>\w+)\s+{token_tag_end}
             (?P<code>.*?)
-            {%\s+endblock(?:\s+\1)?\s+%}
-        ''', re.DOTALL | re.VERBOSE)
+            {token_tag_start}\s+endblock(?:\s+\1)?\s+{token_tag_end}
+        '''.format(
+            token_tag_start=re.escape(self.TOKEN_TAG_START),
+            token_tag_end=re.escape(self.TOKEN_TAG_END),
+        ), re.DOTALL | re.VERBOSE)
 
         self.context = {
             k: v
