@@ -40,14 +40,8 @@ class CodeBuilder(object):
     def forward_indent(self):
         self.indent_level += self.INDENT_STEP
 
-    def back_indent(self):
+    def backward_indent(self):
         self.indent_level -= self.INDENT_STEP
-
-    def add_section(self):
-        """new section based on current indent_level"""
-        section = CodeBuilder(self.indent_level)
-        self.source_code.append(section)
-        return section
 
     def _compile(self):
         assert self.indent_level == 0
@@ -63,7 +57,7 @@ class CodeBuilder(object):
         return locals_dict
 
     def __str__(self):
-        return ''.join(str(s) for s in self.source_code)
+        return ''.join(map(str, self.source_code))
 
     def __repr__(self):
         return self.__str__()
@@ -185,19 +179,19 @@ class Template(object):
                 # {% if xxx %}, {% elif xxx %}, {% for xxx %}
                 if tag_name in ('if', 'elif', 'for'):
                     if tag_name in ('elif',):
-                        self.code.back_indent()
+                        self.code.backward_indent()
 
                     self.code.add_line('{}:', express)
                     self.code.forward_indent()
 
                 # {% else %}
                 elif tag_name in ('else',):
-                    self.code.back_indent()
+                    self.code.backward_indent()
                     self.code.add_line('{}:', tag_name)
                     self.code.forward_indent()
 
                 elif tag_name.startswith('end'):  # {% endif %}, {% endfor %}
-                    self.code.back_indent()
+                    self.code.backward_indent()
                     self.flush_buffer()
 
                 elif tag_name in ('include',):
@@ -221,7 +215,7 @@ class Template(object):
 
         self.flush_buffer()
         self.code.add_line('return "".join({})', self.result_var)
-        self.code.back_indent()
+        self.code.backward_indent()
 
     def handle_extends(self, text):
         """replace all blocks in extends with current blocks"""
