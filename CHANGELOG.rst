@@ -2,7 +2,7 @@ ChangeLog
 ----------
 
 
-0.1.5 (2016-mm-dd)
+0.1.5 (2016-03-12)
 ====================
 
 * [new] template engine: support ``{{ block.super }}``
