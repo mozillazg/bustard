@@ -40,14 +40,8 @@ class CodeBuilder(object):
     def forward_indent(self):
         self.indent_level += self.INDENT_STEP
 
-    def back_indent(self):
+    def backward_indent(self):
         self.indent_level -= self.INDENT_STEP
-
-    def add_section(self):
-        """new section based on current indent_level"""
-        section = CodeBuilder(self.indent_level)
-        self.source_code.append(section)
-        return section
 
     def _compile(self):
         assert self.indent_level == 0
@@ -63,7 +57,7 @@ class CodeBuilder(object):
         return locals_dict
 
     def __str__(self):
-        return ''.join(str(s) for s in self.source_code)
+        return ''.join(map(str, self.source_code))
 
     def __repr__(self):
         return self.__str__()
@@ -97,14 +91,31 @@ class Template(object):
                     token_comment_end=re.escape(self.TOKEN_COMMENT_END),
                     )
         )
-        self.re_extends = re.compile(
-            r'^{%\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+%}'
-        )
+        # {% extends "base.html" %}
+        self.re_extends = re.compile(r'''
+            ^{token_tag_start}\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+
+            {token_tag_end}
+        '''.format(
+            token_tag_start=re.escape(self.TOKEN_TAG_START),
+            token_tag_end=re.escape(self.TOKEN_TAG_END),
+        ), re.VERBOSE)
+        # {% block header %}...{% endbloc header %}
         self.re_block = re.compile(r'''
-            {%\s+block\s+(?P<name>\w+)\s+%}
+            {token_tag_start}\s+block\s+(?P<name>\w+)\s+{token_tag_end}
             (?P<code>.*?)
-            {%\s+endblock(?:\s+\1)?\s+%}
-        ''', re.DOTALL | re.VERBOSE)
+            {token_tag_start}\s+endblock(?:\s+\1)?\s+{token_tag_end}
+        '''.format(
+            token_tag_start=re.escape(self.TOKEN_TAG_START),
+            token_tag_end=re.escape(self.TOKEN_TAG_END),
+        ), re.DOTALL | re.VERBOSE)
+        # {{ block.super }}
+        self.re_block_super = re.compile(r'''
+            {token_expr_start}\s+block\.super\s+
+            {token_expr_end}
+        '''.format(
+            token_expr_start=re.escape(self.TOKEN_EXPR_START),
+            token_expr_end=re.escape(self.TOKEN_EXPR_END),
+        ), re.VERBOSE)
 
         self.context = {
             k: v
@@ -168,19 +179,19 @@ class Template(object):
                 # {% if xxx %}, {% elif xxx %}, {% for xxx %}
                 if tag_name in ('if', 'elif', 'for'):
                     if tag_name in ('elif',):
-                        self.code.back_indent()
+                        self.code.backward_indent()
 
                     self.code.add_line('{}:', express)
                     self.code.forward_indent()
 
                 # {% else %}
                 elif tag_name in ('else',):
-                    self.code.back_indent()
+                    self.code.backward_indent()
                     self.code.add_line('{}:', tag_name)
                     self.code.forward_indent()
 
                 elif tag_name.startswith('end'):  # {% endif %}, {% endfor %}
-                    self.code.back_indent()
+                    self.code.backward_indent()
                     self.flush_buffer()
 
                 elif tag_name in ('include',):
@@ -204,7 +215,7 @@ class Template(object):
 
         self.flush_buffer()
         self.code.add_line('return "".join({})', self.result_var)
-        self.code.back_indent()
+        self.code.backward_indent()
 
     def handle_extends(self, text):
         """replace all blocks in extends with current blocks"""
@@ -227,8 +238,10 @@ class Template(object):
     def replace_blocks_in_extends(self, extends_text, blocks):
         def replace(match):
             name = match.group('name')
-            code = match.group('code')
-            return blocks.get(name) or code
+            old_code = match.group('code')
+            code = blocks.get(name) or old_code
+            # {{ block.super }}
+            return self.re_block_super.sub(old_code, code)
         return self.re_block.sub(replace, extends_text)
 
     def render(self, **context):
