@@ -1,6 +1,10 @@
 bustard
 -----------
 
+.. image:: https://badges.gitter.im/mozillazg/bustard.svg
+   :alt: Join the chat at https://gitter.im/mozillazg/bustard
+   :target: https://gitter.im/mozillazg/bustard?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
 |Build| |Coverage| |Pypi version|
 
 A tiny WSGI web framework.
