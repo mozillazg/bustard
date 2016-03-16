@@ -79,9 +79,9 @@ class Template(object):
                  result_var='__result',
                  auto_escape=True
                  ):
-        self.re_tokens = re.compile(r'''(?sx)(
-        (?:{token_expr_start}.*?{token_expr_end})
-        |(?:{token_tag_start}.*?{token_tag_end})
+        self.re_tokens = re.compile(r'''(?x)(
+        (?:{token_expr_start} .+? {token_expr_end})
+        |(?:{token_tag_start} .+? {token_tag_end})
         |(?:{token_comment_start}.*?{token_comment_end})
         )'''.format(token_expr_start=re.escape(self.TOKEN_EXPR_START),
                     token_expr_end=re.escape(self.TOKEN_EXPR_END),
@@ -99,7 +99,7 @@ class Template(object):
             token_tag_start=re.escape(self.TOKEN_TAG_START),
             token_tag_end=re.escape(self.TOKEN_TAG_END),
         ), re.VERBOSE)
-        # {% block header %}...{% endbloc header %}
+        # {% block header %}...{% endblock header %}
         self.re_block = re.compile(r'''
             {token_tag_start}\s+block\s+(?P<name>\w+)\s+{token_tag_end}
             (?P<code>.*?)
