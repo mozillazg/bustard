@@ -14,7 +14,7 @@ from .servers import WSGIRefServer
 from . import sessions
 
 
-class Bustard(object):
+class Bustard:
     session_class = sessions.MemorySession
     before_request_hooks = (sessions.before_request_hook,)
     after_request_hooks = (sessions.after_request_hook,)

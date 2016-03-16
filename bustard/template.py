@@ -25,7 +25,7 @@ from .constants import TEMPLATE_BUILTIN_FUNC_WHITELIST
 from .utils import to_text
 
 
-class CodeBuilder(object):
+class CodeBuilder:
     INDENT_STEP = 4
 
     def __init__(self, indent=0):
@@ -63,7 +63,7 @@ class CodeBuilder(object):
         return self.__str__()
 
 
-class Template(object):
+class Template:
     TOKEN_EXPR_START = '{{'
     TOKEN_EXPR_END = '}}'
     TOKEN_TAG_START = '{%'

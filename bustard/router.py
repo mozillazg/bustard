@@ -4,7 +4,7 @@ import re
 import urllib
 
 
-class Router(object):
+class Router:
     def __init__(self):
         self._urls_regex_map = {}
         self._urls_builer_map = {}
@@ -39,7 +39,7 @@ class Router(object):
         return ''
 
 
-class URLBuilder(object):
+class URLBuilder:
     # /<int:id>
     RE_PATH_TYPE = re.compile(r'''<
     (?:(?P<type>int|float|path):)?

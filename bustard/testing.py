@@ -66,7 +66,7 @@ def build_multipart_body(data, files):
     return body, length, boundary
 
 
-class Client(object):
+class Client:
 
     def __init__(self, app, host='localhost', port='80', cookies=None):
         self.app = app
@@ -136,7 +136,7 @@ class Client(object):
         return self.open(path, method='DELETE', **kwargs)
 
 
-class EnvironBuilder(object):
+class EnvironBuilder:
 
     def __init__(self, host='localhost', port='80',
                  multithread=False, multiprocess=False,
