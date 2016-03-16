@@ -1,7 +1,7 @@
 ChangeLog
 ----------
 
-0.1.6 (2016-03-12)
+0.1.6 (2016-mm-dd)
 ====================
 
 * [change] template engine: variable and tag can't be empty.
