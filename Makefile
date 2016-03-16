@@ -4,7 +4,7 @@ help:
 	@echo "publish"
 
 .PHONY: test
-tests:
+test:
 	@py.test --cov bustard tests --cov-report=term-missing
 
 .PHONY: publish
