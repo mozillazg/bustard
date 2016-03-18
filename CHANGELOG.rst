@@ -4,7 +4,16 @@ ChangeLog
 0.1.6 (2016-mm-dd)
 ====================
 
-* [change] template engine: variable and tag can't be empty.
+template engine
+~~~~~~~~~~~~~~~~~
+
+* [improve] refactoring
+* [change] variable and tag can't be empty
+* [change] ``template.code`` change to ``template.code_builder``
+* [change] ``Template.__init__(self, text, context=None, ...)``
+  change to ``Template.__init__(self, text, default_context=None, ...)``
+* [change] ``Template.TOKEN_EXPR_START`` change to ``Template.TOKEN_VARIABLE_START``
+* [change] ``Template.TOKEN_EXPR_END`` change to ``Template.TOKEN_VARIABLE_END``
 
 
 0.1.5 (2016-03-12)
