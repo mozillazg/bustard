@@ -1,7 +1,12 @@
 .PHONY: help
 help:
-	@echo "tests"
+	@echo "test"
+	@echo "publish"
 
-.PHONY: tests
-tests:
+.PHONY: test
+test:
 	@py.test --cov bustard tests --cov-report=term-missing
+
+.PHONY: publish
+publish:
+	@python setup.py publish

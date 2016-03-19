@@ -25,17 +25,20 @@ from .constants import TEMPLATE_BUILTIN_FUNC_WHITELIST
 from .utils import to_text
 
 
-class CodeBuilder(object):
+class CodeBuilder:
     INDENT_STEP = 4
 
     def __init__(self, indent=0):
         self.source_code = []
         self.indent_level = indent
 
+    def add(self, code):
+        self.source_code.append(code)
+
     def add_line(self, line, *args, **kwargs):
         line = line.format(*args, **kwargs)
         line = ' ' * self.indent_level + line + '\n'
-        self.source_code.extend([line])
+        self.source_code.append(line)
 
     def forward_indent(self):
         self.indent_level += self.INDENT_STEP
@@ -48,13 +51,12 @@ class CodeBuilder(object):
         self._code = compile(str(self), '<source>', 'exec')
         return self._code
 
-    def _exec(self, globals_dict=None, locals_dict=None):
+    def _exec(self, globals_dict=None):
         """exec compiled code"""
         globals_dict = globals_dict or {}
         globals_dict.setdefault('__builtins__', {})
-        locals_dict = locals_dict or {}
-        exec(self._code, globals_dict, locals_dict)
-        return locals_dict
+        exec(self._code, globals_dict)
+        return globals_dict
 
     def __str__(self):
         return ''.join(map(str, self.source_code))
@@ -63,34 +65,55 @@ class CodeBuilder(object):
         return self.__str__()
 
 
-class Template(object):
-    TOKEN_EXPR_START = '{{'
-    TOKEN_EXPR_END = '}}'
+class Template:
+    TOKEN_VARIABLE_START = '{{'
+    TOKEN_VARIABLE_END = '}}'
     TOKEN_TAG_START = '{%'
     TOKEN_TAG_END = '%}'
     TOKEN_COMMENT_START = '{#'
     TOKEN_COMMENT_END = '#}'
     FUNC_WHITELIST = TEMPLATE_BUILTIN_FUNC_WHITELIST
 
-    def __init__(self, text, context=None,
+    def __init__(self, text, default_context=None,
                  pre_compile=True,
                  indent=0, template_dir='',
                  func_name='__render_function',
                  result_var='__result',
                  auto_escape=True
                  ):
-        self.re_tokens = re.compile(r'''(?sx)(
-        (?:{token_expr_start}.*?{token_expr_end})
-        |(?:{token_tag_start}.*?{token_tag_end})
+        self.re_tokens = re.compile(r'''(?x)(
+        (?:{token_variable_start} .+? {token_variable_end})
+        |(?:{token_tag_start} .+? {token_tag_end})
         |(?:{token_comment_start}.*?{token_comment_end})
-        )'''.format(token_expr_start=re.escape(self.TOKEN_EXPR_START),
-                    token_expr_end=re.escape(self.TOKEN_EXPR_END),
+        )'''.format(token_variable_start=re.escape(self.TOKEN_VARIABLE_START),
+                    token_variable_end=re.escape(self.TOKEN_VARIABLE_END),
                     token_tag_start=re.escape(self.TOKEN_TAG_START),
                     token_tag_end=re.escape(self.TOKEN_TAG_END),
                     token_comment_start=re.escape(self.TOKEN_COMMENT_START),
                     token_comment_end=re.escape(self.TOKEN_COMMENT_END),
                     )
         )
+        # {{ variable }}
+        self.re_variable = re.compile(r'''
+        {token_variable_start} .+? {token_variable_end}
+        '''.format(
+            token_variable_start=re.escape(self.TOKEN_VARIABLE_START),
+            token_variable_end=re.escape(self.TOKEN_VARIABLE_END)
+        ), re.VERBOSE)
+        # {# comment #}
+        self.re_comment = re.compile(r'''
+        {token_comment_start}.*?{token_comment_end}
+        '''.format(
+            token_comment_start=re.escape(self.TOKEN_COMMENT_START),
+            token_comment_end=re.escape(self.TOKEN_COMMENT_END)
+        ), re.VERBOSE)
+        # {% tag %}
+        self.re_tag = re.compile(r'''
+        {token_tag_start}.*?{token_tag_end}
+        '''.format(
+            token_tag_start=re.escape(self.TOKEN_TAG_START),
+            token_tag_end=re.escape(self.TOKEN_TAG_END)
+        ), re.VERBOSE)
         # {% extends "base.html" %}
         self.re_extends = re.compile(r'''
             ^{token_tag_start}\s+extends\s+[\'"](?P<path>[^\'"]+)[\'"]\s+
@@ -99,7 +122,7 @@ class Template(object):
             token_tag_start=re.escape(self.TOKEN_TAG_START),
             token_tag_end=re.escape(self.TOKEN_TAG_END),
         ), re.VERBOSE)
-        # {% block header %}...{% endbloc header %}
+        # {% block header %}...{% endblock header %}
         self.re_block = re.compile(r'''
             {token_tag_start}\s+block\s+(?P<name>\w+)\s+{token_tag_end}
             (?P<code>.*?)
@@ -110,37 +133,37 @@ class Template(object):
         ), re.DOTALL | re.VERBOSE)
         # {{ block.super }}
         self.re_block_super = re.compile(r'''
-            {token_expr_start}\s+block\.super\s+
-            {token_expr_end}
+            {token_variable_start}\s+block\.super\s+
+            {token_variable_end}
         '''.format(
-            token_expr_start=re.escape(self.TOKEN_EXPR_START),
-            token_expr_end=re.escape(self.TOKEN_EXPR_END),
+            token_variable_start=re.escape(self.TOKEN_VARIABLE_START),
+            token_variable_end=re.escape(self.TOKEN_VARIABLE_END),
         ), re.VERBOSE)
 
-        self.context = {
+        self.default_context = {
             k: v
             for k, v in builtins.__dict__.items()
             if k in self.FUNC_WHITELIST
         }
-        self.context.update({
+        self.default_context.update({
             'escape': escape,
             'noescape': noescape,
             'to_text': noescape,
         })
-        if context is not None:
-            self.context.update(context)
+        if default_context is not None:
+            self.default_context.update(default_context)
         self.base_dir = template_dir
         self.func_name = func_name
         self.result_var = result_var
         self.auto_escape = auto_escape
 
         self.buffered = []   # store common string
-        self.code = code = CodeBuilder(indent=indent)
+        self.code_builder = code_builder = CodeBuilder(indent=indent)
         # def func_name():
         #     result = []
-        code.add_line('def {}():', func_name)
-        code.forward_indent()
-        code.add_line('{} = []', self.result_var)
+        code_builder.add_line('def {}():', func_name)
+        code_builder.forward_indent()
+        code_builder.add_line('{} = []', self.result_var)
 
         self.tpl_text = text
         self.parse_text(text)
@@ -152,70 +175,94 @@ class Template(object):
             return self.parse_text(extends_text)
 
         tokens = self.re_tokens.split(text)
+        handlers = (
+            (self.re_variable.match, self._handle_variable),   # {{ variable }}
+            (self.re_tag.match, self._handle_tag),             # {% tag %}
+            (self.re_comment.match, self._handle_comment),     # {# comment #}
+        )
+        default_handler = self._handle_string                  # common string
 
         for token in tokens:
-            # common string
-            if not self.re_tokens.match(token):
-                self.buffered.append('{}'.format(repr(token)))
-            # comment {# ... #}
-            elif token.startswith(self.TOKEN_COMMENT_START):
-                continue
-            # {{ abc }}
-            elif token.startswith(self.TOKEN_EXPR_START):
-                express = self.strip_token(token, self.TOKEN_EXPR_START,
-                                           self.TOKEN_EXPR_END).strip()
-                if self.auto_escape:
-                    self.buffered.append('escape({})'.format(express))
-                else:
-                    self.buffered.append('to_text({})'.format(express))
-
-            # {% blala %}
-            elif token.startswith(self.TOKEN_TAG_START):
-                self.flush_buffer()
-                express = self.strip_token(token, self.TOKEN_TAG_START,
-                                           self.TOKEN_TAG_END).strip()
-                words = express.split()
-                tag_name = words[0]
-                # {% if xxx %}, {% elif xxx %}, {% for xxx %}
-                if tag_name in ('if', 'elif', 'for'):
-                    if tag_name in ('elif',):
-                        self.code.backward_indent()
-
-                    self.code.add_line('{}:', express)
-                    self.code.forward_indent()
-
-                # {% else %}
-                elif tag_name in ('else',):
-                    self.code.backward_indent()
-                    self.code.add_line('{}:', tag_name)
-                    self.code.forward_indent()
-
-                elif tag_name.startswith('end'):  # {% endif %}, {% endfor %}
-                    self.code.backward_indent()
-                    self.flush_buffer()
-
-                elif tag_name in ('include',):
-                    # parse included template file
-                    # def func_name():    # current
-                    #     result = []
-                    #     ...
-                    #     def func_name_inclued():   # included
-                    #         result_included = []
-                    #         ...
-                    #         return ''.join(result_included)
-                    #     result.append(func_name_inclued())
-                    #     return ''.join(result)
-                    path = ''.join(words[1:]).strip().strip('\'"')
-                    _template = self.handle_include(path)
-                    self.code.source_code.append(_template.code)
-                    self.code.add_line(
-                        '{0}.append({1}())',
-                        self.result_var, _template.func_name
-                    )
+            for match, handler in handlers:
+                if match(token):
+                    handler(token)
+                    break
+            else:
+                default_handler(token)
 
         self.flush_buffer()
-        self.code.add_line('return "".join({})', self.result_var)
-        self.code.backward_indent()
+        self.code_builder.add_line('return "".join({})', self.result_var)
+        self.code_builder.backward_indent()
+
+    def _handle_variable(self, token):
+        variable = self.strip_token(token, self.TOKEN_VARIABLE_START,
+                                    self.TOKEN_VARIABLE_END).strip()
+        if self.auto_escape:
+            self.buffered.append('escape({})'.format(variable))
+        else:
+            self.buffered.append('to_text({})'.format(variable))
+
+    def _handle_comment(self, token):
+        pass
+
+    def _handle_string(self, token):
+        self.buffered.append('{}'.format(repr(token)))
+
+    def _handle_tag(self, token):
+        self.flush_buffer()
+        tag = self.strip_token(token, self.TOKEN_TAG_START,
+                               self.TOKEN_TAG_END).strip()
+        tag_name = tag.split()[0]
+        if tag_name == 'include':
+            self._handle_include(tag)
+        else:
+            self._handle_statement(tag, tag_name)
+
+    def _handle_statement(self, tag, tag_name):
+        if tag_name in ('if', 'elif', 'else', 'for'):
+            if tag_name in ('elif', 'else'):
+                self.code_builder.backward_indent()
+            self.code_builder.add_line('{}:'.format(tag))
+            self.code_builder.forward_indent()
+        elif tag_name in ('break',):
+            self.code_builder.add_line(tag)
+        elif tag_name in ('endif', 'endfor'):
+            self.code_builder.backward_indent()
+
+    def _handle_include(self, tag):
+        # parse included template file
+        # def func_name():    # current
+        #     result = []
+        #     ...
+        #     def func_name_inclued():   # included
+        #         result_included = []
+        #         ...
+        #         return ''.join(result_included)
+        #     result.append(func_name_inclued())
+        #     return ''.join(result)
+        path = ''.join(tag.split()[1:]).strip().strip('\'"')
+        _template = self._parse_another_template_file(path)
+        self.code_builder.add(_template.code_builder)
+        self.code_builder.add_line(
+            '{0}.append({1}())',
+            self.result_var, _template.func_name
+        )
+
+    def _parse_another_template_file(self, path):
+        path = os.path.join(self.base_dir, path)
+        _hash = str(hash(path)).replace('-', '_').replace('.', '_')
+        func_name = self.func_name + _hash
+        result_var = self.result_var + _hash
+
+        with open(path, encoding='utf-8') as f:
+            _template = self.__class__(
+                f.read(), default_context=self.default_context,
+                pre_compile=False, indent=self.code_builder.indent_level,
+                template_dir=self.base_dir,
+                auto_escape=self.auto_escape,
+                func_name=func_name, result_var=result_var
+            )
+            return _template
 
     def handle_extends(self, text):
         """replace all blocks in extends with current blocks"""
@@ -245,38 +292,21 @@ class Template(object):
         return self.re_block.sub(replace, extends_text)
 
     def render(self, **context):
-        self.code._compile()
+        self.code_builder._compile()
         globals_dict = {
-            '__builtins__': self.context,
+            '__builtins__': self.default_context,
         }
         globals_dict.update(context)
-        namespace = self.code._exec(globals_dict, {})
+        namespace = self.code_builder._exec(globals_dict)
         self.render_function = namespace[self.func_name]
 
         html = self.render_function()
         return self.cleanup_extra_whitespaces(html)
 
-    def handle_include(self, path):
-        path = os.path.join(self.base_dir, path)
-        _hash = str(hash(path)).replace('-', '_').replace('.', '_')
-        func_name = self.func_name + _hash
-        result_var = self.result_var + _hash
-
-        with open(path, encoding='utf-8') as f:
-            _template = self.__class__(
-                f.read(), context=self.context,
-                pre_compile=False, indent=self.code.indent_level,
-                template_dir=self.base_dir,
-                auto_escape=self.auto_escape,
-                func_name=func_name, result_var=result_var
-            )
-            return _template
-
     def flush_buffer(self):
         """flush all buffered string into code"""
-        self.code.add_line('{0}.extend([{1}])',
-                           self.result_var, ','.join(self.buffered)
-                           )
+        self.code_builder.add_line('{0}.extend([{1}])',
+                                   self.result_var, ','.join(self.buffered))
         self.buffered = []
 
     def strip_token(self, text, start, end):

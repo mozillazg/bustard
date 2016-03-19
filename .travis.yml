@@ -20,7 +20,7 @@ before_script:
 script:
   - export BUSTARD_TEST_PG_URI='postgresql://postgres@localhost/exampledb'
   - pre-commit run --all-files
-  - make tests
+  - make test
 
 after_script:
   - coveralls

@@ -11,7 +11,7 @@ from .utils import (
 )
 
 
-class Request(object):
+class Request:
 
     def __init__(self, environ):
         self.environ = environ
@@ -177,7 +177,7 @@ class Request(object):
             return parse_basic_auth_header(auth_header_value)
 
 
-class Response(object):
+class Response:
 
     def __init__(self, content=b'', status_code=200,
                  content_type='text/html; charset=utf-8',

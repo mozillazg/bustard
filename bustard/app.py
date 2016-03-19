@@ -14,7 +14,7 @@ from .servers import WSGIRefServer
 from . import sessions
 
 
-class Bustard(object):
+class Bustard:
     session_class = sessions.MemorySession
     before_request_hooks = (sessions.before_request_hook,)
     after_request_hooks = (sessions.after_request_hook,)
@@ -173,6 +173,6 @@ def render_template(template_name, template_dir='', default_context=None,
                     context=None, **kwargs):
     with open(os.path.join(template_dir, template_name),
               encoding='utf-8') as f:
-        return Template(f.read(), context=default_context,
+        return Template(f.read(), default_context=default_context,
                         template_dir=template_dir, **kwargs
                         ).render(**context)
