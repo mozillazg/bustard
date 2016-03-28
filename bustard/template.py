@@ -216,9 +216,10 @@ class Template:
         if tag_name == 'include':
             self._handle_include(tag)
         else:
-            self._handle_statement(tag, tag_name)
+            self._handle_statement(tag)
 
     def _handle_statement(self, tag, tag_name):
+        tag_name = tag.split()[0]
         if tag_name in ('if', 'elif', 'else', 'for'):
             if tag_name in ('elif', 'else'):
                 self.code_builder.backward_indent()

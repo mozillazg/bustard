@@ -10,3 +10,5 @@
 * [ ] builtin WSGI server
   * [ ] refactoring
   * [ ] support handle multi request at once
+    * [ ] support multi-processes mode
+    * [ ] support multi-threads mode
